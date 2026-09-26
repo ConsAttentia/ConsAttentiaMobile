@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 
 import { MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
+import { recordActivity } from '@/lib/activity';
 
 const pieces = [
   { id: 'principal1', image: require('../../assets/images/consattentia/principal1.jpg'), label: 'Cena 1' },
@@ -52,6 +53,7 @@ export default function ToheScreen() {
   function finishExperiment() {
     const isCorrect = slots.every((slot) => placements[slot] === `principal${slot}`);
     if (isCorrect) {
+      void recordActivity();
       setComplete(true);
       setMessage('');
       return;

@@ -21,7 +21,13 @@
       "favicon": "./assets/images/consattentia-logo.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "Permita que o ConsAttentia encontre psicologos proximos de voce."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

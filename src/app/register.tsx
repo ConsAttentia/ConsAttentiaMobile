@@ -2,14 +2,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 
-import {
-  AuthButton,
-  AuthField,
-  AuthFrame,
-  AuthHeading,
-  AuthLink,
-  AuthMessage,
-} from '@/components/auth-ui';
+import { AuthButton, AuthField, AuthFrame, AuthHeading, AuthLink, AuthMessage } from '@/components/auth-ui';
 import { getAuthErrorMessage, register } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 
@@ -22,7 +15,6 @@ export default function RegisterScreen() {
 
   useEffect(() => {
     if (!auth) return;
-
     return onAuthStateChanged(auth, (user) => {
       if (user) router.replace('/home');
     });
@@ -42,7 +34,6 @@ export default function RegisterScreen() {
       setMessage('Configure o Firebase no arquivo .env para habilitar o cadastro.');
       return;
     }
-
     setBusy(true);
     try {
       await register(name, email, password);
@@ -57,36 +48,9 @@ export default function RegisterScreen() {
   return (
     <AuthFrame footer={<AuthLink onPress={() => router.replace('/')}>Já tenho uma conta</AuthLink>}>
       <AuthHeading title="Criar conta" subtitle="Comece preenchendo seus dados." />
-      <AuthField
-        autoCapitalize="words"
-        autoComplete="name"
-        label="Nome"
-        onChangeText={setName}
-        placeholder="Seu nome"
-        returnKeyType="next"
-        value={name}
-      />
-      <AuthField
-        autoCapitalize="none"
-        autoComplete="email"
-        keyboardType="email-address"
-        label="E-mail"
-        onChangeText={setEmail}
-        placeholder="seu@email.com"
-        returnKeyType="next"
-        value={email}
-      />
-      <AuthField
-        autoCapitalize="none"
-        autoComplete="new-password"
-        label="Senha"
-        onChangeText={setPassword}
-        onSubmitEditing={handleRegister}
-        placeholder="Mínimo de 6 caracteres"
-        returnKeyType="done"
-        secureTextEntry
-        value={password}
-      />
+      <AuthField autoCapitalize="words" autoComplete="name" label="Nome" onChangeText={setName} placeholder="Seu nome" returnKeyType="next" value={name} />
+      <AuthField autoCapitalize="none" autoComplete="email" keyboardType="email-address" label="E-mail" onChangeText={setEmail} placeholder="seu@email.com" returnKeyType="next" value={email} />
+      <AuthField autoCapitalize="none" autoComplete="new-password" label="Senha" onChangeText={setPassword} onSubmitEditing={handleRegister} placeholder="Mínimo de 6 caracteres" returnKeyType="done" secureTextEntry value={password} />
       <AuthButton busy={busy} label="Cadastrar" onPress={handleRegister} />
       {message ? <AuthMessage>{message}</AuthMessage> : null}
     </AuthFrame>
