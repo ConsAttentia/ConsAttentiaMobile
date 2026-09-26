@@ -10,35 +10,42 @@ import {
   AuthLink,
   AuthMessage,
 } from '@/components/auth-ui';
-import { getAuthErrorMessage, signIn } from '@/lib/auth';
+import { getAuthErrorMessage, register } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
 
-export default function LoginScreen() {
+export default function RegisterScreen() {
+  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-  const [checkingSession, setCheckingSession] = useState(Boolean(auth));
 
   useEffect(() => {
     if (!auth) return;
 
     return onAuthStateChanged(auth, (user) => {
-      setCheckingSession(false);
       if (user) router.replace('/home');
     });
   }, []);
 
-  async function handleLogin() {
+  async function handleRegister() {
     setMessage('');
-    if (!email.trim() || !password) {
-      setMessage('Preencha o e-mail e a senha.');
+    if (!name.trim() || !email.trim() || !password) {
+      setMessage('Preencha nome, e-mail e senha.');
+      return;
+    }
+    if (password.length < 6) {
+      setMessage('A senha precisa ter pelo menos 6 caracteres.');
+      return;
+    }
+    if (!auth) {
+      setMessage('Configure o Firebase no arquivo .env para habilitar o cadastro.');
       return;
     }
 
     setBusy(true);
     try {
-      await signIn(email, password);
+      await register(name, email, password);
       router.replace('/home');
     } catch (error) {
       setMessage(getAuthErrorMessage(error));
@@ -48,8 +55,17 @@ export default function LoginScreen() {
   }
 
   return (
-    <AuthFrame footer={<AuthLink onPress={() => router.push('/register')}>Criar conta</AuthLink>}>
-      <AuthHeading title="Bem-vindo" subtitle="Entre na sua conta ConsAttentia." />
+    <AuthFrame footer={<AuthLink onPress={() => router.replace('/')}>Já tenho uma conta</AuthLink>}>
+      <AuthHeading title="Criar conta" subtitle="Comece preenchendo seus dados." />
+      <AuthField
+        autoCapitalize="words"
+        autoComplete="name"
+        label="Nome"
+        onChangeText={setName}
+        placeholder="Seu nome"
+        returnKeyType="next"
+        value={name}
+      />
       <AuthField
         autoCapitalize="none"
         autoComplete="email"
@@ -62,20 +78,17 @@ export default function LoginScreen() {
       />
       <AuthField
         autoCapitalize="none"
-        autoComplete="current-password"
+        autoComplete="new-password"
         label="Senha"
         onChangeText={setPassword}
-        onSubmitEditing={handleLogin}
-        placeholder="Sua senha"
+        onSubmitEditing={handleRegister}
+        placeholder="Mínimo de 6 caracteres"
         returnKeyType="done"
         secureTextEntry
         value={password}
       />
-      <AuthButton busy={busy || checkingSession} label="Entrar" onPress={handleLogin} />
+      <AuthButton busy={busy} label="Cadastrar" onPress={handleRegister} />
       {message ? <AuthMessage>{message}</AuthMessage> : null}
-      {!auth ? (
-        <AuthMessage>Configure o Firebase no arquivo .env para habilitar o acesso.</AuthMessage>
-      ) : null}
     </AuthFrame>
   );
 }

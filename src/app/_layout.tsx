@@ -1,18 +1,39 @@
-import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
-import * as SplashScreen from 'expo-splash-screen';
-import { useColorScheme } from 'react-native';
+import { onAuthStateChanged } from 'firebase/auth';
+import { useEffect } from 'react';
+import { router, Stack, useSegments } from 'expo-router';
 
-import { AnimatedSplashOverlay } from '@/components/animated-icon';
-import AppTabs from '@/components/app-tabs';
+import { AccessibilityProvider } from '@/context/accessibility-context';
+import { auth } from '@/lib/firebase';
 
-SplashScreen.preventAutoHideAsync();
+export default function RootLayout() {
+  const segments = useSegments();
 
-export default function TabLayout() {
-  const colorScheme = useColorScheme();
+  useEffect(() => {
+    if (!auth) return;
+
+    const publicRoutes = new Set(['', 'register']);
+    const currentRoute = segments.join('/');
+    const isPublicRoute = publicRoutes.has(currentRoute);
+
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      const isAuthenticated = Boolean(user);
+
+      if (isAuthenticated && isPublicRoute) {
+        router.replace('/home');
+        return;
+      }
+
+      if (!isAuthenticated && !isPublicRoute) {
+        router.replace('/');
+      }
+    });
+
+    return unsubscribe;
+  }, [segments]);
+
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <AnimatedSplashOverlay />
-      <AppTabs />
-    </ThemeProvider>
+    <AccessibilityProvider>
+      <Stack screenOptions={{ headerShown: false }} />
+    </AccessibilityProvider>
   );
 }
