@@ -34,8 +34,9 @@ export async function recordActivity(): Promise<ActivityHistory> {
   let events: number[] = [];
   try {
     const stored = await AsyncStorage.getItem(activityStorageKey);
-    events = Array.isArray(stored ? JSON.parse(stored) : null)
-      ? (JSON.parse(stored ?? '[]') as unknown[]).map(Number).filter((event) => Number.isFinite(event))
+    const parsed: unknown = stored ? JSON.parse(stored) : null;
+    events = Array.isArray(parsed)
+      ? parsed.map(Number).filter((event) => Number.isFinite(event))
       : [];
     const cutoff = Date.now() - hourCount * hourInMilliseconds;
     events = [...events.filter((event) => event >= cutoff), Date.now()];

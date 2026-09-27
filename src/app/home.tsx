@@ -10,8 +10,8 @@ import { auth } from '@/lib/firebase';
 import { readActivityHistory, type ActivityHistory } from '@/lib/activity';
 
 const tests = [
-  { title: 'Tohe', description: 'Organize cenas e forme uma historia em sequencia.', image: require('../../assets/images/consattentia/pose.png'), available: true },
-  { title: 'AATS', description: 'Aperte corretamente conforme as palavras citadas nos áudios.', image: require('../../assets/images/consattentia/fita.png'), available: false },
+  { title: 'Tohe', description: 'Organize cenas e forme uma historia em sequencia.', image: require('../../assets/images/consattentia/pose.png'), available: true, route: '/tohe' as const },
+  { title: 'AATS', description: 'Aperte quando ouvir palavras-alvo durante os áudios.', image: require('../../assets/images/consattentia/fita.png'), available: true, route: '/aats' as const },
 ];
 
 export default function HomeScreen() {
@@ -34,23 +34,32 @@ export default function HomeScreen() {
   }, []);
 
   useEffect(() => {
+    let active = true;
     const refreshActivity = () => {
-      readActivityHistory().then(setActivityHistory);
+      void readActivityHistory().then((history) => {
+        if (active) setActivityHistory(history);
+      });
     };
     refreshActivity();
     const interval = setInterval(refreshActivity, 60 * 1000);
-    return () => clearInterval(interval);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
   }, []);
 
   return (
-    <MobileFrame>
+    <MobileFrame compactContent>
       <View style={styles.homeContent}>
       <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.dashboardHero}>
         <View style={styles.heroTop}>
           <View><Text style={styles.welcome}>Bem Vindo</Text><Text style={styles.userLabel}>{user ? getUserName(user) : 'Usuario'}</Text></View>
           <View style={styles.avatar}><View style={styles.avatarHead} /><View style={styles.avatarBody} /></View>
         </View>
-        <Text style={styles.activityTitle}>Atividade recente</Text>
+        <View style={styles.activityHeading}>
+          <Text style={styles.activityTitle}>Atividade recente</Text>
+          <Text style={styles.activityTotal}>{activityHistory.reduce((total, count) => total + count, 0)} eventos / 24h</Text>
+        </View>
         <ActivityGraph history={activityHistory} barColor={palette.accent} />
       </LinearGradient>
 
@@ -93,14 +102,17 @@ export default function HomeScreen() {
 
 function ActivityGraph({ history, barColor }: { history: ActivityHistory; barColor: string }) {
   const maxValue = Math.max(1, ...history);
-  const barHeights = history.map((value) => Math.max(4, (value / maxValue) * 58));
-  return <View style={styles.graph}>
-    {[0, 1, 2, 3].map((line) => <View key={line} style={[styles.graphLine, { top: line * 17 }]} />)}
-    <View style={styles.graphBars}>
-      {barHeights.map((height, index) => <View key={`${index}-${height}`} style={[styles.graphBar, { height, backgroundColor: barColor }]} />)}
+  const barHeights = history.map((value) => value === 0 ? 2 : Math.max(8, (value / maxValue) * 56));
+  const total = history.reduce((sum, count) => sum + count, 0);
+  return (
+    <View accessibilityRole="image" accessibilityLabel={`Atividade nas últimas 24 horas: ${total} registros`} style={styles.graph}>
+      {[0, 1, 2, 3].map((line) => <View key={line} style={[styles.graphLine, { top: line * 18 + 4 }]} />)}
+      <View style={styles.graphBars}>
+        {barHeights.map((height, index) => <View key={index} style={[styles.graphBar, { height, backgroundColor: barColor }]} />)}
+      </View>
+      <View style={styles.graphLabels}>{['24h', '20h', '16h', '12h', '8h', '4h', 'agora'].map((label) => <Text key={label} style={styles.graphLabel}>{label}</Text>)}</View>
     </View>
-    <View style={styles.graphLabels}>{['24h', '20h', '16h', '12h', '8h', '4h', 'agora'].map((label) => <Text key={label} style={styles.graphLabel}>{label}</Text>)}</View>
-  </View>;
+  );
 }
 
 function TestsSheet({ visible, onClose, palette }: { visible: boolean; onClose: () => void; palette: ReturnType<typeof useAccessiblePalette> }) {
@@ -117,7 +129,15 @@ function TestsSheet({ visible, onClose, palette }: { visible: boolean; onClose: 
           {tests.map((test) => <View key={test.title} style={[styles.testCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
             <Image accessibilityLabel={test.title} resizeMode="contain" source={test.image} style={styles.testImage} />
             <View style={styles.testCopy}><Text style={[styles.testTitle, { color: palette.text }]}>{test.title}</Text><Text style={[styles.testDescription, { color: palette.muted }]}>{test.description}</Text>
-              <Pressable accessibilityRole="button" disabled={!test.available} onPress={() => { onClose(); router.push('/tohe'); }} style={[styles.testAction, { backgroundColor: test.available ? palette.primary : palette.border }]}><Text style={[styles.testActionText, !test.available && { color: palette.muted }]}>{test.available ? 'Iniciar teste' : 'Em breve'}</Text></Pressable>
+              {test.available ? (
+                <Pressable accessibilityRole="button" onPress={() => { onClose(); router.push(test.route); }} style={[styles.testAction, { backgroundColor: palette.primary }]}>
+                  <Text style={styles.testActionText}>Iniciar teste</Text>
+                </Pressable>
+              ) : (
+                <Pressable accessibilityRole="button" disabled style={[styles.testAction, { backgroundColor: palette.border }]}>
+                  <Text style={[styles.testActionText, { color: palette.muted }]}>Em breve</Text>
+                </Pressable>
+              )}
             </View>
           </View>)}
         </ScrollView>
@@ -128,11 +148,11 @@ function TestsSheet({ visible, onClose, palette }: { visible: boolean; onClose: 
 
 const styles = StyleSheet.create({
   homeContent: { gap: 12 },
-  dashboardHero: { marginHorizontal: -20, marginTop: -22, paddingHorizontal: 22, paddingTop: 22, paddingBottom: 16 },
+  dashboardHero: { marginHorizontal: -20, paddingHorizontal: 22, paddingTop: 16, paddingBottom: 14 },
   heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, welcome: { color: '#FFFFFF', fontSize: 24, lineHeight: 28, fontWeight: '400' }, userLabel: { color: '#E2F0ED', fontSize: 12 },
   avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#E5E7E5', alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' }, avatarHead: { position: 'absolute', top: 10, width: 16, height: 16, borderRadius: 8, backgroundColor: '#969996' }, avatarBody: { width: 34, height: 18, borderRadius: 18, backgroundColor: '#969996', marginBottom: 5 },
-  activityTitle: { marginTop: 14, color: '#DFF1EB', fontSize: 12 }, graph: { height: 88, marginTop: 4, position: 'relative' }, graphLine: { position: 'absolute', left: 12, right: 4, height: 1, backgroundColor: 'rgba(255,255,255,0.55)' }, graphLabels: { position: 'absolute', left: 7, right: 0, bottom: 0, flexDirection: 'row', justifyContent: 'space-between' }, graphLabel: { color: '#DFF1EB', fontSize: 8 },
-  graphBars: { position: 'absolute', left: 12, right: 4, bottom: 20, height: 48, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between', opacity: 0.9 }, graphBar: { width: 4, borderRadius: 3, backgroundColor: '#B7F23A' },
+  activityHeading: { marginTop: 12, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }, activityTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' }, activityTotal: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' }, graph: { height: 96, marginTop: 4, position: 'relative' }, graphLine: { position: 'absolute', left: 12, right: 4, height: 1, backgroundColor: 'rgba(255,255,255,0.35)' }, graphLabels: { position: 'absolute', left: 7, right: 0, bottom: 0, flexDirection: 'row', justifyContent: 'space-between' }, graphLabel: { color: '#FFFFFF', fontSize: 10, fontWeight: '500' },
+  graphBars: { position: 'absolute', left: 12, right: 4, bottom: 22, height: 62, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }, graphBar: { width: 6, maxWidth: 8, borderRadius: 4, backgroundColor: '#B7F23A' },
   section: { gap: 8 }, aboutSection: { alignItems: 'center', gap: 6 }, sectionTitle: { fontSize: 13, fontWeight: '500' }, sectionUnderline: { width: 56, height: 3, borderRadius: 2, marginTop: -2 }, mapPlaceholder: { width: '100%', height: 176, borderWidth: 1, borderRadius: 7, alignItems: 'center', justifyContent: 'center', gap: 4 }, placeholderTitle: { fontSize: 14, fontWeight: '600' }, placeholderCopy: { fontSize: 11, lineHeight: 15 },
   homeActions: { marginTop: 0 }, testsButton: { alignSelf: 'center', minWidth: 146, minHeight: 36, paddingHorizontal: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, testsButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
   projectLink: { alignItems: 'center', gap: 4 }, projectButton: { alignSelf: 'center', minWidth: 112, minHeight: 34, borderWidth: 1.5, borderRadius: 17, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' }, projectButtonText: { fontSize: 13, fontWeight: '700' }, projectLinkCopy: { maxWidth: 270, fontSize: 11, lineHeight: 15, textAlign: 'center' },

@@ -45,18 +45,20 @@ export function getBrandGradientColors(palette: ReturnType<typeof useAccessibleP
 export function MobileFrame({
   children,
   scroll = true,
+  compactContent = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
+  compactContent?: boolean;
 }) {
   const palette = useAccessiblePalette();
   const gradientColors = getBrandGradientColors(palette);
   const content = scroll ? (
-    <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
+    <ScrollView contentContainerStyle={[styles.content, compactContent && styles.compactContent]} keyboardShouldPersistTaps="handled">
       {children}
     </ScrollView>
   ) : (
-    <View style={[styles.content, styles.flexContent]}>{children}</View>
+    <View style={[styles.content, compactContent && styles.compactContent, styles.flexContent]}>{children}</View>
   );
 
   return (
@@ -83,10 +85,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 18,
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     overflow: 'hidden',
   },
   logo: { width: 230, height: 62 },
   content: { flexGrow: 1, paddingHorizontal: 20, paddingTop: 22, paddingBottom: 36, gap: 20 },
+  compactContent: { paddingTop: 0, paddingBottom: 16, gap: 12 },
   flexContent: { flex: 1 },
 });
