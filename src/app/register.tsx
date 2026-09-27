@@ -1,5 +1,4 @@
-import { onAuthStateChanged } from 'firebase/auth';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { router } from 'expo-router';
 
 import { AuthButton, AuthField, AuthFrame, AuthHeading, AuthLink, AuthMessage } from '@/components/auth-ui';
@@ -12,13 +11,6 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
-
-  useEffect(() => {
-    if (!auth) return;
-    return onAuthStateChanged(auth, (user) => {
-      if (user) router.replace('/home');
-    });
-  }, []);
 
   async function handleRegister() {
     setMessage('');

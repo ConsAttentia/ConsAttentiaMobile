@@ -13,6 +13,10 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { LinearGradient } from 'expo-linear-gradient';
+
+import { getBrandGradientColors, useAccessiblePalette } from '@/components/mobile-shell';
+import { BottomNavigation } from '@/components/bottom-navigation';
 
 const colors = {
   canvas: '#E6EDF3',
@@ -28,56 +32,68 @@ const colors = {
 export { colors as authColors };
 
 export function AuthFrame({ children, footer }: { children: ReactNode; footer?: ReactNode }) {
+  const palette = useAccessiblePalette();
+  const gradientColors = getBrandGradientColors(palette);
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <SafeAreaView edges={['top', 'left', 'right']} style={[styles.safeArea, { backgroundColor: palette.background }]}>
       <StatusBar style="dark" />
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled">
           <View style={styles.page}>
-            <View style={styles.cornerTop} />
-            <View style={styles.cornerBottom} />
+            <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.cornerTop} />
+            <LinearGradient colors={gradientColors} start={{ x: 1, y: 0.5 }} end={{ x: 0, y: 0.5 }} style={styles.cornerBottom} />
             <Image accessibilityLabel="ConsAttentia" resizeMode="contain" source={require('../../assets/images/consattentia-logo.png')} style={styles.brandLogo} />
-            <View style={styles.formArea}>{children}</View>
+            <View style={[styles.formArea, { backgroundColor: palette.surface, borderColor: palette.border }]}>{children}</View>
             {footer ? <View style={styles.footer}>{footer}</View> : null}
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <BottomNavigation />
     </SafeAreaView>
   );
 }
 
 export function AuthHeading({ title, subtitle }: { title: string; subtitle: string }) {
+  const palette = useAccessiblePalette();
   return (
     <View style={styles.heading}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.subtitle}>{subtitle}</Text>
+      <Text style={[styles.title, { color: palette.text }]}>{title}</Text>
+      <Text style={[styles.subtitle, { color: palette.muted }]}>{subtitle}</Text>
     </View>
   );
 }
 
 export function AuthField({ label, style, ...props }: TextInputProps & { label: string }) {
+  const palette = useAccessiblePalette();
   return (
     <View style={styles.fieldGroup}>
-      <Text style={styles.fieldLabel}>{label}</Text>
-      <TextInput accessibilityLabel={label} placeholderTextColor="#8B9993" style={[styles.input, style]} {...props} />
+      <Text style={[styles.fieldLabel, { color: palette.text }]}>{label}</Text>
+      <TextInput accessibilityLabel={label} placeholderTextColor={palette.muted} style={[styles.input, { backgroundColor: palette.background, borderColor: palette.border, color: palette.text }, style]} {...props} />
     </View>
   );
 }
 
 export function AuthButton({ label, busy, onPress }: { label: string; busy?: boolean; onPress: () => void }) {
+  const gradientColors = getBrandGradientColors(useAccessiblePalette());
+
   return (
     <Pressable accessibilityRole="button" disabled={busy} onPress={onPress} style={({ pressed }) => [styles.button, pressed && styles.buttonPressed, busy && styles.disabled]}>
-      <Text style={styles.buttonText}>{busy ? 'Aguarde...' : label}</Text>
+      <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.buttonGradient}>
+        <Text style={styles.buttonText}>{busy ? 'Aguarde...' : label}</Text>
+      </LinearGradient>
     </Pressable>
   );
 }
 
 export function AuthMessage({ children }: { children: ReactNode }) {
-  return <View accessibilityRole="alert" style={styles.message}><Text style={styles.messageText}>{children}</Text></View>;
+  const palette = useAccessiblePalette();
+  return <View accessibilityRole="alert" style={[styles.message, { backgroundColor: palette.dangerBackground }]}><Text style={[styles.messageText, { color: palette.danger }]}>{children}</Text></View>;
 }
 
 export function AuthLink({ children, onPress }: { children: string; onPress: () => void }) {
-  return <Pressable accessibilityRole="button" hitSlop={12} onPress={onPress}><Text style={styles.link}>{children}</Text></Pressable>;
+  const palette = useAccessiblePalette();
+  return <Pressable accessibilityRole="button" hitSlop={12} onPress={onPress}><Text style={[styles.link, { color: palette.accent }]}>{children}</Text></Pressable>;
 }
 
 const styles = StyleSheet.create({
@@ -95,7 +111,8 @@ const styles = StyleSheet.create({
   fieldGroup: { gap: 7, marginBottom: 15 },
   fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '600' },
   input: { width: '100%', minHeight: 50, borderRadius: 8, borderWidth: 1, borderColor: '#D6E0E4', backgroundColor: '#FAFCFD', paddingHorizontal: 14, color: colors.ink, fontSize: 16 },
-  button: { minHeight: 50, marginTop: 7, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: colors.green },
+  button: { minHeight: 50, marginTop: 7, borderRadius: 8, overflow: 'hidden' },
+  buttonGradient: { minHeight: 50, alignItems: 'center', justifyContent: 'center' },
   buttonPressed: { opacity: 0.85 },
   disabled: { opacity: 0.6 },
   buttonText: { color: colors.white, fontSize: 16, fontWeight: '700' },

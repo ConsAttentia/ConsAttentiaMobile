@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useRef, useState } from 'react';
 import {
   Image,
   Modal,
@@ -10,7 +11,7 @@ import {
   View,
 } from 'react-native';
 
-import { MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
+import { getBrandGradientColors, MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
 import { recordActivity } from '@/lib/activity';
 
 const pieces = [
@@ -27,10 +28,32 @@ const slots = [1, 2, 3, 4] as const;
 
 export default function ToheScreen() {
   const palette = useAccessiblePalette();
+  const gradientColors = getBrandGradientColors(palette);
   const [placements, setPlacements] = useState<Placements>(emptyBoard);
   const [selectedPiece, setSelectedPiece] = useState<PieceId | null>(null);
   const [message, setMessage] = useState('');
   const [complete, setComplete] = useState(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [wrongAttemptCount, setWrongAttemptCount] = useState(0);
+  const startedAt = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (complete) return;
+    if (startedAt.current === null) startedAt.current = Date.now();
+    const startTime = startedAt.current;
+
+    const interval = setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startTime) / 1000));
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [complete]);
+
+  const elapsedHours = Math.floor(elapsedSeconds / 3600);
+  const elapsedMinutes = Math.floor((elapsedSeconds % 3600) / 60);
+  const elapsedRemainder = elapsedSeconds % 60;
+  const elapsedLabel = elapsedHours > 0
+    ? `${String(elapsedHours).padStart(2, '0')}:${String(elapsedMinutes).padStart(2, '0')}:${String(elapsedRemainder).padStart(2, '0')}`
+    : `${String(elapsedMinutes).padStart(2, '0')}:${String(elapsedRemainder).padStart(2, '0')}`;
 
   function placePiece(slot: 1 | 2 | 3 | 4) {
     if (!selectedPiece) {
@@ -53,11 +76,16 @@ export default function ToheScreen() {
   function finishExperiment() {
     const isCorrect = slots.every((slot) => placements[slot] === `principal${slot}`);
     if (isCorrect) {
+      const completedAt = Date.now();
+      if (startedAt.current !== null) {
+        setElapsedSeconds(Math.floor((completedAt - startedAt.current) / 1000));
+      }
       void recordActivity();
       setComplete(true);
       setMessage('');
       return;
     }
+    setWrongAttemptCount((count) => count + 1);
     setMessage('Organize todas as cenas na ordem correta para concluir.');
   }
 
@@ -66,6 +94,9 @@ export default function ToheScreen() {
     setSelectedPiece(null);
     setMessage('');
     setComplete(false);
+    setWrongAttemptCount(0);
+    startedAt.current = Date.now();
+    setElapsedSeconds(0);
   }
 
   return (
@@ -97,9 +128,9 @@ export default function ToheScreen() {
               ) : (
                 <Text style={[styles.slotNumber, { color: palette.muted }]}>{slot}</Text>
               )}
-              <View style={[styles.slotBadge, { backgroundColor: palette.primary }]}>
+              <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.slotBadge}>
                 <Text style={styles.slotBadgeText}>{slot}</Text>
-              </View>
+              </LinearGradient>
             </Pressable>
           );
         })}
@@ -149,8 +180,10 @@ export default function ToheScreen() {
         <Pressable accessibilityRole="button" onPress={resetExperiment} style={[styles.secondaryButton, { borderColor: palette.primary }]}>
           <Text style={[styles.secondaryText, { color: palette.primary }]}>Limpar</Text>
         </Pressable>
-        <Pressable accessibilityRole="button" onPress={finishExperiment} style={[styles.finishButton, { backgroundColor: palette.primary }]}>
-          <Text style={styles.finishText}>Concluir</Text>
+        <Pressable accessibilityRole="button" onPress={finishExperiment} style={styles.finishButton}>
+          <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.finishGradient}>
+            <Text style={styles.finishText}>Concluir</Text>
+          </LinearGradient>
         </Pressable>
       </View>
 
@@ -160,8 +193,12 @@ export default function ToheScreen() {
             <Text style={[styles.successKicker, { color: palette.primary }]}>CONSATTENTIA · TOHE</Text>
             <Text style={[styles.successTitle, { color: palette.text }]}>Parabéns!</Text>
             <Text style={[styles.successCopy, { color: palette.muted }]}>Você organizou as quatro cenas na ordem correta.</Text>
-            <Pressable accessibilityRole="button" onPress={() => router.replace('/selecao')} style={[styles.finishButton, { backgroundColor: palette.primary }]}>
-              <Text style={styles.finishText}>Voltar aos experimentos</Text>
+            <Text style={[styles.successTime, { color: palette.muted }]}>Tempo para concluir: {elapsedLabel}</Text>
+            <Text style={[styles.successTime, { color: palette.muted }]}>{wrongAttemptCount + 1 === 1 ? '1 tentativa' : `${wrongAttemptCount + 1} tentativas`}</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.replace({ pathname: '/home', params: { openTests: '1' } })} style={styles.finishButton}>
+              <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.finishGradient}>
+                <Text style={styles.finishText}>Voltar aos experimentos</Text>
+              </LinearGradient>
             </Pressable>
             <Pressable accessibilityRole="button" onPress={resetExperiment} style={styles.tryAgainButton}>
               <Text style={[styles.secondaryText, { color: palette.primary }]}>Tentar novamente</Text>
@@ -197,12 +234,14 @@ const styles = StyleSheet.create({
   actions: { flexDirection: 'row', gap: 10 },
   secondaryButton: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   secondaryText: { fontSize: 14, fontWeight: '700' },
-  finishButton: { flex: 1, minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  finishButton: { flex: 1, minHeight: 48, borderRadius: 8, overflow: 'hidden' },
+  finishGradient: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   finishText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   successBackdrop: { flex: 1, padding: 22, justifyContent: 'center', backgroundColor: 'rgba(10, 30, 33, 0.72)' },
   successPanel: { borderWidth: 1, borderRadius: 12, padding: 24, alignItems: 'center', gap: 12 },
   successKicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1 },
   successTitle: { fontSize: 29, fontWeight: '700' },
   successCopy: { fontSize: 14, lineHeight: 20, textAlign: 'center' },
+  successTime: { fontSize: 13, lineHeight: 18, textAlign: 'center' },
   tryAgainButton: { minHeight: 42, justifyContent: 'center' },
 });

@@ -15,10 +15,7 @@ export default function LoginScreen() {
 
   useEffect(() => {
     if (!auth) return;
-    return onAuthStateChanged(auth, (user) => {
-      setCheckingSession(false);
-      if (user) router.replace('/home');
-    });
+    return onAuthStateChanged(auth, () => setCheckingSession(false));
   }, []);
 
   async function handleLogin() {

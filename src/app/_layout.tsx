@@ -18,11 +18,6 @@ export default function RootLayout() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       const isAuthenticated = Boolean(user);
 
-      if (isAuthenticated && isPublicRoute) {
-        router.replace('/home');
-        return;
-      }
-
       if (!isAuthenticated && !isPublicRoute) {
         router.replace('/');
       }
