@@ -253,8 +253,8 @@ export function ToheGame({ stages }: { stages: readonly ToheStage[] }) {
             <Pressable accessibilityRole="button" onPress={() => resetExperiment(Date.now())} style={[styles.secondaryButton, { borderColor: palette.primary }]}>
               <Text style={[styles.secondaryText, { color: palette.primary }]}>Limpar</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={() => finishExperiment(Date.now())} style={styles.finishButton}>
-              <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.finishGradient}>
+            <Pressable accessibilityRole="button" onPress={() => finishExperiment(Date.now())} style={styles.compactFinishButton}>
+              <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.compactFinishGradient}>
                 <Text style={styles.finishText}>Concluir nível</Text>
               </LinearGradient>
             </Pressable>
@@ -263,8 +263,8 @@ export function ToheGame({ stages }: { stages: readonly ToheStage[] }) {
       )}
 
       {stage.placeholderImage ? (
-        <Pressable accessibilityRole="button" disabled={!placeholderReady} onPress={() => finishExperiment(Date.now())} style={[styles.finishButton, !placeholderReady && styles.disabledButton]}>
-          <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.finishGradient}>
+        <Pressable accessibilityRole="button" disabled={!placeholderReady} onPress={() => finishExperiment(Date.now())} style={[styles.compactFinishButton, !placeholderReady && styles.disabledButton]}>
+          <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.compactFinishGradient}>
             <Text style={styles.finishText}>Finalizar teste</Text>
           </LinearGradient>
         </Pressable>
@@ -328,9 +328,11 @@ const styles = StyleSheet.create({
   secondaryButton: { flex: 1, minHeight: 48, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
   secondaryText: { fontSize: 14, fontWeight: '700' },
   finishButton: { flex: 1, minHeight: 48, borderRadius: 8, overflow: 'hidden' },
+  compactFinishButton: { flex: 1, minHeight: 40, borderRadius: 8, overflow: 'hidden' },
   successAction: { width: '100%', flex: 0 },
   disabledButton: { opacity: 0.55 },
   finishGradient: { flex: 1, minHeight: 48, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
+  compactFinishGradient: { flex: 1, minHeight: 40, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
   finishText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700', textAlign: 'center' },
   successBackdrop: { flex: 1, padding: 22, justifyContent: 'center', backgroundColor: 'rgba(10, 30, 33, 0.72)' },
   successPanel: { borderWidth: 1, borderRadius: 12, padding: 24, alignItems: 'center', gap: 12 },
