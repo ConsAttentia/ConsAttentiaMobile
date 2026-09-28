@@ -1,185 +1,160 @@
 import { onAuthStateChanged, type User } from 'firebase/auth';
 import { useEffect, useState } from 'react';
-import { router } from 'expo-router';
-import { ActivityIndicator, Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
-import { getAuthErrorMessage, getUserName, signOutUser } from '@/lib/auth';
+import { getBrandGradientColors, MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
+import { getUserName } from '@/lib/auth';
 import { auth } from '@/lib/firebase';
+import { readActivityHistory, type ActivityHistory } from '@/lib/activity';
 
-const benefits = [
-  {
-    number: '01',
-    label: 'ROTINA',
-    title: 'Atenção no cotidiano',
-    text: 'Práticas para exercitar o foco e apoiar organização, memória e realização de tarefas.',
-  },
-  {
-    number: '02',
-    label: 'ACESSO',
-    title: 'Acesso para todos',
-    text: 'Atividades curtas e acessíveis, pensadas para diferentes ritmos e necessidades.',
-  },
-  {
-    number: '03',
-    label: 'EVOLUÇÃO',
-    title: 'Desenvolvimento contínuo',
-    text: 'Uma proposta de prática consistente para estimular habilidades cognitivas.',
-  },
-];
-
-const team = [
-  { name: 'Lucas', role: 'Pesquisa e conteúdo', image: require('../../assets/images/consattentia/lucasserio.jpg') },
-  { name: 'Saymon', role: 'Desenvolvimento', image: require('../../assets/images/consattentia/eu.jpg') },
-  { name: 'Giovani', role: 'Design e acessibilidade', image: require('../../assets/images/consattentia/giovanni.jpg') },
+const tests = [
+  { title: 'Tohe', description: 'Organize cenas e forme uma historia em sequencia.', image: require('../../assets/images/consattentia/pose.png'), available: true, route: '/tohe' as const },
+  { title: 'AATS', description: 'Aperte quando ouvir palavras-alvo durante os áudios.', image: require('../../assets/images/consattentia/fita.png'), available: true, route: '/aats' as const },
 ];
 
 export default function HomeScreen() {
+  const { openTests } = useLocalSearchParams<{ openTests?: string }>();
   const [user, setUser] = useState<User | null>(null);
-  const [loading, setLoading] = useState(Boolean(auth));
-  const [aboutOpen, setAboutOpen] = useState(false);
+  const [testsOpen, setTestsOpen] = useState(false);
+  const [activityHistory, setActivityHistory] = useState<ActivityHistory>(Array(24).fill(0));
   const palette = useAccessiblePalette();
+  const gradientColors = getBrandGradientColors(palette);
 
   useEffect(() => {
     if (!auth) {
       router.replace('/');
       return;
     }
-
     return onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
-      setLoading(false);
       if (!currentUser) router.replace('/');
     });
   }, []);
 
-  async function handleSignOut() {
-    try {
-      await signOutUser();
-      router.replace('/');
-    } catch (error) {
-      Alert.alert('Não foi possível sair', getAuthErrorMessage(error));
-    }
-  }
+  useEffect(() => {
+    let active = true;
+    const refreshActivity = () => {
+      void readActivityHistory().then((history) => {
+        if (active) setActivityHistory(history);
+      });
+    };
+    refreshActivity();
+    const interval = setInterval(refreshActivity, 60 * 1000);
+    return () => {
+      active = false;
+      clearInterval(interval);
+    };
+  }, []);
 
   return (
-    <MobileFrame onLogout={handleSignOut}>
-      {loading ? <ActivityIndicator color={palette.primary} size="large" /> : null}
-      <View style={[styles.hero, { backgroundColor: palette.primary }]}>
-        <Text style={[styles.heroKicker, { letterSpacing: palette.wideLetters + 0.8 }]}>FOCO QUE ACOMPANHA VOCÊ</Text>
-        <Text style={[styles.welcome, { letterSpacing: palette.wideLetters }]}>Bem-vindo{user ? `, ${getUserName(user)}` : ''}.</Text>
-        <Text style={[styles.heroCopy, { letterSpacing: palette.wideLetters }]}>Exercite a atenção com atividades interativas e estruturadas.</Text>
-        <Image
-          accessibilityLabel="Pessoa participando de uma atividade de atenção"
-          resizeMode="contain"
-          source={require('../../assets/images/consattentia/personagem.png')}
-          style={styles.heroImage}
-        />
-        <Pressable accessibilityRole="button" onPress={() => router.push('/selecao')} style={styles.primaryButton}>
-          <Text style={styles.primaryButtonText}>Iniciar experimento</Text>
+    <MobileFrame compactContent>
+      <View style={styles.homeContent}>
+      <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.dashboardHero}>
+        <View style={styles.heroTop}>
+          <View><Text style={styles.welcome}>Bem Vindo</Text><Text style={styles.userLabel}>{user ? getUserName(user) : 'Usuario'}</Text></View>
+          <View style={styles.avatar}><View style={styles.avatarHead} /><View style={styles.avatarBody} /></View>
+        </View>
+        <View style={styles.activityHeading}>
+          <Text style={styles.activityTitle}>Atividade recente</Text>
+          <Text style={styles.activityTotal}>{activityHistory.reduce((total, count) => total + count, 0)} eventos / 24h</Text>
+        </View>
+        <ActivityGraph history={activityHistory} barColor={palette.accent} />
+      </LinearGradient>
+
+      <View style={[styles.section, styles.aboutSection]}>
+        <Text style={[styles.sectionTitle, { color: palette.accent }]}>Encontre psicólogos próximos</Text>
+        <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.sectionUnderline} />
+        <View style={[styles.mapPlaceholder, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+          <Text style={[styles.placeholderTitle, { color: palette.text }]}>O mapa aparecerá aqui</Text>
+          <Text style={[styles.placeholderCopy, { color: palette.muted }]}>Localização de psicólogos próximos</Text>
+        </View>
+      </View>
+
+      <View style={styles.homeActions}>
+        <Pressable accessibilityRole="button" onPress={() => setTestsOpen(true)}>
+          <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.testsButton}>
+            <Text style={styles.testsButtonText}>Explorar Testes</Text>
+          </LinearGradient>
         </Pressable>
       </View>
 
-      <View style={styles.sectionHeading}>
-        <Text style={[styles.kicker, { color: palette.primary }]}>A PROPOSTA</Text>
-        <Text style={[styles.sectionTitle, { color: palette.text, letterSpacing: palette.wideLetters }]}>Conheça o ConsAttentia</Text>
-      </View>
-
-      {benefits.map((benefit) => (
-        <View key={benefit.number} style={[styles.benefitRow, { borderColor: palette.border }]}>
-          <View style={[styles.numberMark, { backgroundColor: palette.primary }]}>
-            <Text style={styles.numberText}>{benefit.number}</Text>
-          </View>
-          <View style={styles.benefitCopy}>
-            <Text style={[styles.benefitLabel, { color: palette.primary, letterSpacing: palette.wideLetters }]}>{benefit.label}</Text>
-            <Text style={[styles.benefitTitle, { color: palette.text, letterSpacing: palette.wideLetters }]}>{benefit.title}</Text>
-            <Text style={[styles.bodyText, { color: palette.muted, letterSpacing: palette.wideLetters }]}>{benefit.text}</Text>
-          </View>
-        </View>
-      ))}
-
-      <View style={[styles.teamSection, { backgroundColor: palette.surface }]}>
-        <Text style={[styles.kicker, { color: palette.primary }]}>QUEM FAZ</Text>
-        <Text style={[styles.sectionTitle, { color: palette.text, letterSpacing: palette.wideLetters }]}>Sobre nós</Text>
-        <Text style={[styles.bodyText, { color: palette.muted, letterSpacing: palette.wideLetters }]}>
-          Projeto de TCC desenvolvido por estudantes da Etec de Hortolândia, unindo tecnologia, pesquisa e acessibilidade.
-        </Text>
-        <Pressable accessibilityRole="button" onPress={() => setAboutOpen(true)} style={[styles.aboutButton, { borderColor: palette.primary }]}>
-          <Text style={[styles.aboutButtonText, { color: palette.primary }]}>Ler sobre o projeto</Text>
+      <View style={styles.projectLink}>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/sobre')} style={[styles.projectButton, { backgroundColor: palette.surface, borderColor: palette.accent }]}>
+          <Text style={[styles.projectButtonText, { color: palette.accent }]}>Sobre nós</Text>
         </Pressable>
-        {team.map((member) => (
-          <View key={member.name} style={styles.teamMember}>
-            <Image accessibilityLabel={`Foto de ${member.name}`} source={member.image} style={styles.teamImage} />
-            <View style={styles.teamCopy}>
-              <Text style={[styles.teamName, { color: palette.text }]}>{member.name}</Text>
-              <Text style={[styles.teamRole, { color: palette.primary }]}>{member.role}</Text>
-            </View>
-          </View>
-        ))}
+        <Text style={[styles.projectLinkCopy, { color: palette.muted }]}>Informações sobre os integrantes e o projeto</Text>
       </View>
-      <Text style={[styles.footerNote, { color: palette.muted, letterSpacing: palette.wideLetters }]}>
-        A atenção é uma habilidade que pode ser estimulada continuamente.
-      </Text>
-      <Modal animationType="fade" onRequestClose={() => setAboutOpen(false)} transparent visible={aboutOpen}>
-        <View style={styles.aboutBackdrop}>
-          <View style={[styles.aboutModal, { backgroundColor: palette.surface, borderColor: palette.border }]}>
-            <View style={[styles.aboutModalHeader, { backgroundColor: palette.primary }]}>
-              <Text style={styles.aboutModalTitle}>Sobre o projeto</Text>
-              <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={() => setAboutOpen(false)} style={styles.aboutClose}>
-                <Text style={styles.aboutCloseText}>×</Text>
-              </Pressable>
-            </View>
-            <ScrollView contentContainerStyle={styles.aboutModalBody}>
-              <Text style={[styles.aboutText, { color: palette.text, letterSpacing: palette.wideLetters }]}>
-                O ConsAttentia é um projeto de conclusão de curso desenvolvido por Giovani Leon, Saymon Palermo e Lucas Ricardo, estudantes de Desenvolvimento de Sistemas Integrado ao Ensino Médio na Etec de Hortolândia.
-              </Text>
-              <Text style={[styles.aboutText, { color: palette.text, letterSpacing: palette.wideLetters }]}>
-                O trabalho foi supervisionado pelas professoras Priscila Batista, na preparação do TCC e banco de dados, e Luzia Ivone, psicóloga e especialista em neuropsicologia, que apoiou as pesquisas sobre atenção.
-              </Text>
-              <Text style={[styles.aboutText, { color: palette.text, letterSpacing: palette.wideLetters }]}>
-                A plataforma utiliza React, TypeScript, CSS, Firebase, Git e GitHub. As atividades apresentadas aqui têm propósito educativo e não substituem avaliação profissional.
-              </Text>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+
+      <TestsSheet
+        visible={testsOpen || openTests === '1'}
+        onClose={() => {
+          setTestsOpen(false);
+          if (openTests === '1') router.setParams({ openTests: undefined });
+        }}
+        palette={palette}
+      />
+      </View>
     </MobileFrame>
   );
 }
 
+function ActivityGraph({ history, barColor }: { history: ActivityHistory; barColor: string }) {
+  const maxValue = Math.max(1, ...history);
+  const barHeights = history.map((value) => value === 0 ? 2 : Math.max(8, (value / maxValue) * 56));
+  const total = history.reduce((sum, count) => sum + count, 0);
+  return (
+    <View accessibilityRole="image" accessibilityLabel={`Atividade nas últimas 24 horas: ${total} registros`} style={styles.graph}>
+      {[0, 1, 2, 3].map((line) => <View key={line} style={[styles.graphLine, { top: line * 18 + 4 }]} />)}
+      <View style={styles.graphBars}>
+        {barHeights.map((height, index) => <View key={index} style={[styles.graphBar, { height, backgroundColor: barColor }]} />)}
+      </View>
+      <View style={styles.graphLabels}>{['24h', '20h', '16h', '12h', '8h', '4h', 'agora'].map((label) => <Text key={label} style={styles.graphLabel}>{label}</Text>)}</View>
+    </View>
+  );
+}
+
+function TestsSheet({ visible, onClose, palette }: { visible: boolean; onClose: () => void; palette: ReturnType<typeof useAccessiblePalette> }) {
+  return <Modal animationType="slide" onRequestClose={onClose} transparent visible={visible}>
+    <View style={styles.sheetRoot}>
+      <Pressable accessibilityLabel="Fechar testes" onPress={onClose} style={styles.sheetScrim} />
+      <View style={[styles.testSheet, { backgroundColor: palette.background }]}>
+        <View style={[styles.sheetHandle, { backgroundColor: palette.border }]} />
+        <View style={styles.sheetHeading}>
+          <View><Text style={[styles.sheetEyebrow, { color: palette.primary }]}>CONSATTENTIA</Text><Text style={[styles.sheetTitle, { color: palette.text }]}>Escolha seu teste</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Fechar" onPress={onClose} style={[styles.closeButton, { borderColor: palette.border }]}><Text style={[styles.closeText, { color: palette.text }]}>×</Text></Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.testList} showsVerticalScrollIndicator={false}>
+          {tests.map((test) => <View key={test.title} style={[styles.testCard, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+            <Image accessibilityLabel={test.title} resizeMode="contain" source={test.image} style={styles.testImage} />
+            <View style={styles.testCopy}><Text style={[styles.testTitle, { color: palette.text }]}>{test.title}</Text><Text style={[styles.testDescription, { color: palette.muted }]}>{test.description}</Text>
+              {test.available ? (
+                <Pressable accessibilityRole="button" onPress={() => { onClose(); router.push(test.route); }} style={[styles.testAction, { backgroundColor: palette.primary }]}>
+                  <Text style={styles.testActionText}>Iniciar teste</Text>
+                </Pressable>
+              ) : (
+                <Pressable accessibilityRole="button" disabled style={[styles.testAction, { backgroundColor: palette.border }]}>
+                  <Text style={[styles.testActionText, { color: palette.muted }]}>Em breve</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>)}
+        </ScrollView>
+      </View>
+    </View>
+  </Modal>;
+}
+
 const styles = StyleSheet.create({
-  hero: { overflow: 'hidden', padding: 22, borderRadius: 10 },
-  heroKicker: { color: '#F5D990', fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
-  welcome: { marginTop: 12, color: '#FFFFFF', fontSize: 26, lineHeight: 32, fontWeight: '700' },
-  heroCopy: { maxWidth: 290, marginTop: 8, color: '#F3F7F4', fontSize: 15, lineHeight: 22 },
-  heroImage: { width: '100%', height: 190, marginTop: 10 },
-  primaryButton: { minHeight: 48, marginTop: 10, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#174D3A' },
-  primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  sectionHeading: { gap: 5, paddingTop: 4 },
-  kicker: { fontSize: 10, fontWeight: '800', letterSpacing: 1.1 },
-  sectionTitle: { fontSize: 22, lineHeight: 28, fontWeight: '700' },
-  benefitRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 14, paddingVertical: 16, borderBottomWidth: 1 },
-  numberMark: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
-  numberText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  benefitCopy: { flex: 1, gap: 4 },
-  benefitLabel: { fontSize: 9, fontWeight: '800', letterSpacing: 0.8 },
-  benefitTitle: { fontSize: 16, fontWeight: '700' },
-  bodyText: { fontSize: 13, lineHeight: 20 },
-  teamSection: { gap: 12, marginTop: 8, padding: 18, borderRadius: 10 },
-  aboutButton: { alignSelf: 'flex-start', minHeight: 42, paddingHorizontal: 12, borderWidth: 1, borderRadius: 8, justifyContent: 'center' },
-  aboutButtonText: { fontSize: 13, fontWeight: '700' },
-  teamMember: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },
-  teamImage: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#D5E4E5' },
-  teamCopy: { gap: 4 },
-  teamName: { fontSize: 15, fontWeight: '700' },
-  teamRole: { fontSize: 12, fontWeight: '600' },
-  footerNote: { paddingVertical: 8, fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  aboutBackdrop: { flex: 1, padding: 20, justifyContent: 'center', backgroundColor: 'rgba(10, 30, 33, 0.7)' },
-  aboutModal: { maxHeight: '82%', borderWidth: 1, borderRadius: 12, overflow: 'hidden' },
-  aboutModalHeader: { minHeight: 66, paddingHorizontal: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  aboutModalTitle: { color: '#FFFFFF', fontSize: 19, fontWeight: '700' },
-  aboutClose: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, borderColor: 'rgba(255,255,255,0.7)', alignItems: 'center', justifyContent: 'center' },
-  aboutCloseText: { color: '#FFFFFF', fontSize: 24, lineHeight: 27 },
-  aboutModalBody: { padding: 18, gap: 14 },
-  aboutText: { fontSize: 14, lineHeight: 22 },
+  homeContent: { gap: 12 },
+  dashboardHero: { marginHorizontal: -20, paddingHorizontal: 22, paddingTop: 16, paddingBottom: 14 },
+  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, welcome: { color: '#FFFFFF', fontSize: 24, lineHeight: 28, fontWeight: '400' }, userLabel: { color: '#E2F0ED', fontSize: 12 },
+  avatar: { width: 54, height: 54, borderRadius: 27, backgroundColor: '#E5E7E5', alignItems: 'center', justifyContent: 'flex-end', overflow: 'hidden' }, avatarHead: { position: 'absolute', top: 10, width: 16, height: 16, borderRadius: 8, backgroundColor: '#969996' }, avatarBody: { width: 34, height: 18, borderRadius: 18, backgroundColor: '#969996', marginBottom: 5 },
+  activityHeading: { marginTop: 12, flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 8 }, activityTitle: { color: '#FFFFFF', fontSize: 14, fontWeight: '600' }, activityTotal: { color: '#FFFFFF', fontSize: 11, fontWeight: '600' }, graph: { height: 96, marginTop: 4, position: 'relative' }, graphLine: { position: 'absolute', left: 12, right: 4, height: 1, backgroundColor: 'rgba(255,255,255,0.35)' }, graphLabels: { position: 'absolute', left: 7, right: 0, bottom: 0, flexDirection: 'row', justifyContent: 'space-between' }, graphLabel: { color: '#FFFFFF', fontSize: 10, fontWeight: '500' },
+  graphBars: { position: 'absolute', left: 12, right: 4, bottom: 22, height: 62, flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' }, graphBar: { width: 6, maxWidth: 8, borderRadius: 4, backgroundColor: '#B7F23A' },
+  section: { gap: 8 }, aboutSection: { alignItems: 'center', gap: 6 }, sectionTitle: { fontSize: 13, fontWeight: '500' }, sectionUnderline: { width: 56, height: 3, borderRadius: 2, marginTop: -2 }, mapPlaceholder: { width: '100%', height: 176, borderWidth: 1, borderRadius: 7, alignItems: 'center', justifyContent: 'center', gap: 4 }, placeholderTitle: { fontSize: 14, fontWeight: '600' }, placeholderCopy: { fontSize: 11, lineHeight: 15 },
+  homeActions: { marginTop: 0 }, testsButton: { alignSelf: 'center', minWidth: 146, minHeight: 36, paddingHorizontal: 14, borderRadius: 18, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }, testsButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '500' },
+  projectLink: { alignItems: 'center', gap: 4 }, projectButton: { alignSelf: 'center', minWidth: 112, minHeight: 34, borderWidth: 1.5, borderRadius: 17, paddingHorizontal: 16, alignItems: 'center', justifyContent: 'center' }, projectButtonText: { fontSize: 13, fontWeight: '700' }, projectLinkCopy: { maxWidth: 270, fontSize: 11, lineHeight: 15, textAlign: 'center' },
+  sheetRoot: { flex: 1, justifyContent: 'flex-end' }, sheetScrim: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(12,32,35,0.55)' }, testSheet: { maxHeight: '86%', borderTopLeftRadius: 24, borderTopRightRadius: 24, paddingTop: 10, overflow: 'hidden' }, sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, marginBottom: 8 }, sheetHeading: { paddingHorizontal: 20, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }, sheetEyebrow: { fontSize: 10, fontWeight: '800', letterSpacing: 1 }, sheetTitle: { marginTop: 4, fontSize: 23, fontWeight: '700' }, closeButton: { width: 36, height: 36, borderWidth: 1, borderRadius: 18, alignItems: 'center', justifyContent: 'center' }, closeText: { fontSize: 24, lineHeight: 27 }, testList: { gap: 12, padding: 20, paddingTop: 4, paddingBottom: 32 }, testCard: { minHeight: 156, borderWidth: 1, borderRadius: 12, padding: 12, flexDirection: 'row', gap: 12 }, testImage: { width: 116, height: 116, borderRadius: 8 }, testCopy: { flex: 1, justifyContent: 'center', gap: 6 }, testTitle: { fontSize: 20, fontWeight: '700' }, testDescription: { fontSize: 12, lineHeight: 17 }, testAction: { minHeight: 36, paddingHorizontal: 12, borderRadius: 8, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }, testActionText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
 });

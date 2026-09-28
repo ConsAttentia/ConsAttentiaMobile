@@ -1,21 +1,23 @@
 import { router } from 'expo-router';
 import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 
-import { MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
+import { getBrandGradientColors, MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
 
 export default function ExplicacaoScreen() {
   const palette = useAccessiblePalette();
+  const gradientColors = getBrandGradientColors(palette);
 
   return (
     <MobileFrame>
-      <View style={[styles.artPanel, { backgroundColor: palette.primary }]}>
+      <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.artPanel}>
         <Image
           accessibilityLabel="Ilustração sobre habilidades cognitivas"
           resizeMode="contain"
           source={require('../../assets/images/consattentia/fundoc.png')}
           style={styles.art}
         />
-      </View>
+      </LinearGradient>
       <View style={styles.copy}>
         <Text style={[styles.kicker, { color: palette.primary }]}>EXPERIMENTO 01</Text>
         <Text style={[styles.title, { color: palette.text }]}>TOHE</Text>
@@ -29,8 +31,10 @@ export default function ExplicacaoScreen() {
             Esta atividade é apenas um exercício educativo e não fornece diagnóstico ou avaliação psicológica.
           </Text>
         </View>
-        <Pressable accessibilityRole="button" onPress={() => router.push('/tohe')} style={[styles.startButton, { backgroundColor: palette.primary }]}>
-          <Text style={styles.startButtonText}>Iniciar atividade</Text>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/tohe')} style={styles.startButton}>
+          <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.startGradient}>
+            <Text style={styles.startButtonText}>Iniciar atividade</Text>
+          </LinearGradient>
         </Pressable>
       </View>
     </MobileFrame>
@@ -48,6 +52,7 @@ const styles = StyleSheet.create({
   note: { marginTop: 4, padding: 14, borderWidth: 1, borderRadius: 8, gap: 5 },
   noteTitle: { fontSize: 13, fontWeight: '700' },
   noteText: { fontSize: 12, lineHeight: 18 },
-  startButton: { minHeight: 50, marginTop: 4, borderRadius: 8, alignItems: 'center', justifyContent: 'center' },
+  startButton: { minHeight: 50, marginTop: 4, borderRadius: 8, overflow: 'hidden' },
+  startGradient: { minHeight: 50, alignItems: 'center', justifyContent: 'center' },
   startButtonText: { color: '#FFFFFF', fontSize: 16, fontWeight: '700' },
 });
