@@ -1,34 +1,54 @@
-import { onAuthStateChanged } from 'firebase/auth';
+import { useFonts } from 'expo-font';
 import { useEffect } from 'react';
 import { router, Stack, useSegments } from 'expo-router';
+import { StyleSheet, View } from 'react-native';
 
-import { AccessibilityProvider } from '@/context/accessibility-context';
-import { auth } from '@/lib/firebase';
+import { AuthProvider } from '@/features/auth/context/auth-context';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { AccessibilityProvider } from '@/features/accessibility/context/accessibility-context';
+import { theme } from '@/shared/theme';
 
 export default function RootLayout() {
-  const segments = useSegments();
+  const [fontsLoaded, fontError] = useFonts([
+    {
+      fontFamily: theme.typography.fontFamily.accessible,
+      fontDefinitions: [
+        { path: require('../../assets/fonts/AtkinsonHyperlegible-Regular.ttf'), weight: 400 },
+        { path: require('../../assets/fonts/AtkinsonHyperlegible-Bold.ttf'), weight: 700 },
+      ],
+    },
+  ]);
 
-  useEffect(() => {
-    if (!auth) return;
-
-    const publicRoutes = new Set(['', 'register']);
-    const currentRoute = segments.join('/');
-    const isPublicRoute = publicRoutes.has(currentRoute);
-
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      const isAuthenticated = Boolean(user);
-
-      if (!isAuthenticated && !isPublicRoute) {
-        router.replace('/');
-      }
-    });
-
-    return unsubscribe;
-  }, [segments]);
+  if (fontError) throw fontError;
+  if (!fontsLoaded) return <View style={styles.loading} />;
 
   return (
     <AccessibilityProvider>
-      <Stack screenOptions={{ headerShown: false }} />
+      <AuthProvider>
+        <RootNavigator />
+      </AuthProvider>
     </AccessibilityProvider>
   );
 }
+
+function RootNavigator() {
+  const segments = useSegments();
+  const { user, loading } = useAuth();
+
+  const isPublicRoute = segments.join('/') === '' || segments[0] === 'register';
+  const routeBlocked = loading || (!user && !isPublicRoute) || (Boolean(user) && isPublicRoute);
+
+  useEffect(() => {
+    if (loading) return;
+    if (!user && !isPublicRoute) router.replace('/');
+    if (user && isPublicRoute) router.replace('/home');
+  }, [isPublicRoute, loading, user]);
+
+  if (routeBlocked) return <View style={styles.loading} />;
+
+  return <Stack screenOptions={{ headerShown: false }} />;
+}
+
+const styles = StyleSheet.create({
+  loading: { flex: 1, backgroundColor: theme.colors.background },
+});

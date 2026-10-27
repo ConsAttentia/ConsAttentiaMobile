@@ -1,17 +1,22 @@
-import { onAuthStateChanged, type User } from 'firebase/auth';
+import { theme } from '@/shared/theme';
 import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { AuthButton, AuthField } from '@/components/auth-ui';
-import { UtilityPage } from '@/components/utility-page';
-import { useAccessiblePalette } from '@/components/mobile-shell';
-import { getAuthErrorMessage, getUserName, signOutUser, updateAccountName, updateAccountPassword } from '@/lib/auth';
-import { auth } from '@/lib/firebase';
+import { AccessibleText as Text } from '@/features/accessibility/components/accessibility-text';
+import { AuthButton, AuthField } from '@/features/auth/components/auth-ui';
+import { ShareResultButton } from '@/features/results/components/share-result-button';
+import { UtilityPage } from '@/features/dashboard/components/utility-page';
+import { useAccessiblePalette } from '@/features/dashboard/components/mobile-shell';
+import { getUserName, updateAccountName, updateAccountPassword } from '@/features/auth/services/auth';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { notifyAuthError } from '@/features/auth/utils/auth-notifications';
+import { readTestHistory, type SavedTestResult } from '@/features/results/services/test-history';
 
 export default function ProfileScreen() {
-  const [user, setUser] = useState<User | null>(auth?.currentUser ?? null);
-  const [name, setName] = useState(auth?.currentUser ? getUserName(auth.currentUser) : '');
+  const { user, logout } = useAuth();
+  const [name, setName] = useState(user ? getUserName(user) : '');
+  const [nameUserId, setNameUserId] = useState<string | null>(user?.uid ?? null);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [nameNotice, setNameNotice] = useState('');
@@ -22,27 +27,43 @@ export default function ProfileScreen() {
   const [savingName, setSavingName] = useState(false);
   const [savingPassword, setSavingPassword] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [historyResult, setHistoryResult] = useState<{
+    userId: string;
+    entries: SavedTestResult[];
+    error: string | null;
+  } | null>(null);
   const palette = useAccessiblePalette();
+  const historyLoading = Boolean(user && historyResult?.userId !== user.uid);
+  const historyMatchesUser = Boolean(user && historyResult?.userId === user.uid);
+  const historyError = historyMatchesUser ? historyResult?.error ?? '' : '';
+  const testHistory = historyMatchesUser ? historyResult?.entries ?? [] : [];
+  const displayedName = user && nameUserId === user.uid ? name : user ? getUserName(user) : '';
 
   useEffect(() => {
-    if (!auth) {
-      router.replace('/');
-      return;
-    }
+    if (!user) return;
 
-    return onAuthStateChanged(auth, (currentUser) => {
-      if (!currentUser) {
-        router.replace('/');
-        return;
-      }
-      setUser(currentUser);
-      setName(getUserName(currentUser));
-    });
-  }, []);
+    let active = true;
+    readTestHistory(user.uid)
+      .then((history) => {
+        if (active) setHistoryResult({ userId: user.uid, entries: history, error: null });
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setHistoryResult({
+          userId: user.uid,
+          entries: [],
+          error: error instanceof Error ? error.message : 'Não foi possível carregar o histórico de atividades.',
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   async function saveName() {
     if (!user) return;
-    const normalizedName = name.trim();
+    const normalizedName = displayedName.trim();
     setNameNotice('');
     if (!normalizedName) {
       setNameNotice('Digite um nome para continuar.');
@@ -53,11 +74,12 @@ export default function ProfileScreen() {
     setSavingName(true);
     try {
       await updateAccountName(user, normalizedName);
+      setNameUserId(user.uid);
       setName(normalizedName);
       setNameNotice('Nome atualizado com sucesso.');
       setNameNoticeIsError(false);
     } catch (error) {
-      setNameNotice(getAuthErrorMessage(error));
+      setNameNotice(notifyAuthError(error, 'Falha ao atualizar o perfil'));
       setNameNoticeIsError(true);
     } finally {
       setSavingName(false);
@@ -91,7 +113,7 @@ export default function ProfileScreen() {
       setPasswordNotice('Senha atualizada. Use a nova senha no próximo login.');
       setPasswordNoticeIsError(false);
     } catch (error) {
-      setPasswordNotice(getAuthErrorMessage(error));
+      setPasswordNotice(notifyAuthError(error, 'Falha ao atualizar a senha'));
       setPasswordNoticeIsError(true);
     } finally {
       setSavingPassword(false);
@@ -102,10 +124,10 @@ export default function ProfileScreen() {
     setLogoutNotice('');
     setLoggingOut(true);
     try {
-      await signOutUser();
+      await logout();
       router.replace('/');
     } catch (error) {
-      setLogoutNotice(getAuthErrorMessage(error));
+      setLogoutNotice(notifyAuthError(error, 'Falha ao sair da conta'));
       setLoggingOut(false);
     }
   }
@@ -117,7 +139,7 @@ export default function ProfileScreen() {
       description="Gerencie seus dados e sua senha.">
       <View style={[styles.profile, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         <View style={[styles.avatar, { backgroundColor: palette.primary }]}>
-          <Text style={styles.avatarText}>{name.charAt(0).toUpperCase() || '?'}</Text>
+          <Text style={[styles.avatarText, palette.background === theme.colors.highContrast.background && styles.highContrastAvatarText]}>{name.charAt(0).toUpperCase() || '?'}</Text>
         </View>
         <View style={styles.details}>
           <Text style={[styles.label, { color: palette.muted }]}>E-mail da conta</Text>
@@ -127,7 +149,7 @@ export default function ProfileScreen() {
 
       <View style={[styles.formSection, { backgroundColor: palette.surface, borderColor: palette.border }]}>
         <Text style={[styles.sectionTitle, { color: palette.text }]}>Nome do perfil</Text>
-        <AuthField autoCapitalize="words" autoComplete="name" label="Nome completo" onChangeText={setName} placeholder="Seu nome" returnKeyType="done" value={name} />
+        <AuthField autoCapitalize="words" autoComplete="name" label="Nome completo" onChangeText={(value) => { setNameUserId(user?.uid ?? null); setName(value); }} placeholder="Seu nome" returnKeyType="done" value={displayedName} />
         <AuthButton busy={savingName} label="Salvar nome" onPress={saveName} />
         {nameNotice ? <Text style={[styles.notice, { color: nameNoticeIsError ? palette.danger : palette.primary }]}>{nameNotice}</Text> : null}
       </View>
@@ -140,6 +162,24 @@ export default function ProfileScreen() {
         {passwordNotice ? <Text style={[styles.notice, { color: passwordNoticeIsError ? palette.danger : palette.primary }]}>{passwordNotice}</Text> : null}
       </View>
 
+      <View style={[styles.formSection, { backgroundColor: palette.surface, borderColor: palette.border }]}>
+        <Text style={[styles.sectionTitle, { color: palette.text }]}>Histórico de atividades</Text>
+        {historyLoading ? <Text style={[styles.notice, { color: palette.muted }]}>Carregando resultados...</Text> : null}
+        {historyError ? <Text accessibilityRole="alert" style={[styles.notice, { color: palette.danger }]}>{historyError}</Text> : null}
+        {!historyLoading && !historyError && testHistory.length === 0 ? (
+          <Text style={[styles.notice, { color: palette.muted }]}>Os resultados das atividades concluídas aparecerão aqui.</Text>
+        ) : null}
+        {testHistory.map((entry) => (
+          <View key={entry.id} style={[styles.historyEntry, { borderColor: palette.border }]}>
+            <Text style={[styles.historyTitle, { color: palette.text }]}>{entry.testName}</Text>
+            <Text style={[styles.notice, { color: palette.muted }]}>
+              {new Date(entry.generatedAt).toLocaleString('pt-BR')} · {entry.score} {entry.scoreLabel} · {entry.attempts} {entry.attemptsLabel ?? 'respostas'}
+            </Text>
+            <ShareResultButton report={entry} />
+          </View>
+        ))}
+      </View>
+
       <Pressable accessibilityRole="button" disabled={loggingOut} onPress={handleLogout} style={[styles.logoutButton, { borderColor: palette.danger, backgroundColor: palette.surface }]}>
         <Text style={[styles.logoutText, { color: palette.danger }]}>{loggingOut ? 'Saindo...' : 'Sair e voltar para o login'}</Text>
       </Pressable>
@@ -149,15 +189,18 @@ export default function ProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  profile: { borderWidth: 1, borderRadius: 8, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 14 },
-  avatar: { width: 56, height: 56, borderRadius: 28, alignItems: 'center', justifyContent: 'center' },
-  avatarText: { color: '#FFFFFF', fontSize: 23, fontWeight: '700' },
-  details: { flex: 1, minWidth: 0, gap: 4 },
-  label: { fontSize: 12, lineHeight: 17 },
-  value: { fontSize: 15, lineHeight: 21, fontWeight: '600' },
-  formSection: { borderWidth: 1, borderRadius: 8, padding: 16, gap: 8 },
-  sectionTitle: { fontSize: 16, lineHeight: 22, fontWeight: '700' },
-  notice: { fontSize: 12, lineHeight: 17 },
-  logoutButton: { minHeight: 48, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 14 },
-  logoutText: { fontSize: 14, fontWeight: '700' },
+  profile: { borderWidth: theme.sizes[1], borderRadius: theme.radii[8], padding: theme.spacing[16], flexDirection: 'row', alignItems: 'center', gap: theme.spacing[14] },
+  avatar: { width: theme.sizes[56], height: theme.sizes[56], borderRadius: theme.radii[28], alignItems: 'center', justifyContent: 'center' },
+  avatarText: { color: theme.colors.white, fontSize: theme.typography.fontSize[23], fontWeight: '700' },
+  highContrastAvatarText: { color: theme.colors.black },
+  details: { flex: 1, minWidth: theme.sizes[0], gap: theme.spacing[4] },
+  label: { fontSize: theme.typography.fontSize[12], lineHeight: theme.typography.lineHeight[17] },
+  value: { fontSize: theme.typography.fontSize[15], lineHeight: theme.typography.lineHeight[21], fontWeight: '600' },
+  formSection: { borderWidth: theme.sizes[1], borderRadius: theme.radii[8], padding: theme.spacing[16], gap: theme.spacing[8] },
+  historyEntry: { borderTopWidth: theme.sizes[1], paddingTop: theme.spacing[12], gap: theme.spacing[8] },
+  historyTitle: { fontSize: theme.typography.fontSize[14], lineHeight: theme.typography.lineHeight[19], fontWeight: '700' },
+  sectionTitle: { fontSize: theme.typography.fontSize[16], lineHeight: theme.typography.lineHeight[22], fontWeight: '700' },
+  notice: { fontSize: theme.typography.fontSize[12], lineHeight: theme.typography.lineHeight[17] },
+  logoutButton: { minHeight: theme.sizes[48], borderWidth: theme.sizes[1], borderRadius: theme.radii[8], alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing[14] },
+  logoutText: { fontSize: theme.typography.fontSize[14], fontWeight: '700' },
 });

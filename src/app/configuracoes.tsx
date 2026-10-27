@@ -1,5 +1,5 @@
-import { AccessibilitySettings } from '@/components/accessibility-settings';
-import { UtilityPage } from '@/components/utility-page';
+import { AccessibilitySettings } from '@/features/accessibility/components/accessibility-settings';
+import { UtilityPage } from '@/features/dashboard/components/utility-page';
 
 export default function SettingsScreen() {
   return (

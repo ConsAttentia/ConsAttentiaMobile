@@ -1,13 +1,17 @@
+import { theme } from '@/shared/theme';
 import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { LinearGradient } from 'expo-linear-gradient';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { getBrandGradientColors, MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
-import { ShareResultButton } from '@/components/share-result-button';
-import { recordActivity } from '@/lib/activity';
-import { formatDuration } from '@/lib/result-report';
+import { AccessibleText as Text } from '@/features/accessibility/components/accessibility-text';
+import { getBrandGradientColors, MobileFrame, useAccessiblePalette } from '@/features/dashboard/components/mobile-shell';
+import { ShareResultButton } from '@/features/results/components/share-result-button';
+import { useAccessibility } from '@/features/accessibility/context/accessibility-context';
+import { recordActivity } from '@/features/activity/services/activity';
+import { formatDuration } from '@/features/results/services/result-report';
+import { useCompletedTestHistory } from '@/features/results/hooks/use-completed-test-history';
 
 const levels = [
   {
@@ -34,10 +38,31 @@ type LevelResult = {
 };
 
 const emptyStats = () => ({ points: 0, hits: 0, mistimedPresses: 0 });
+const subscribeClientReady = () => () => {};
+const getClientSnapshot = () => true;
+const getServerSnapshot = () => false;
 
 export default function AatsScreen() {
   const palette = useAccessiblePalette();
+  const clientReady = useSyncExternalStore(subscribeClientReady, getClientSnapshot, getServerSnapshot);
+
+  if (!clientReady) {
+    return (
+      <MobileFrame>
+        <View style={styles.loading}>
+          <Text style={[styles.loadingText, { color: palette.primary }]}>Preparando teste de áudio...</Text>
+        </View>
+      </MobileFrame>
+    );
+  }
+
+  return <AatsTest />;
+}
+
+function AatsTest() {
+  const palette = useAccessiblePalette();
   const gradientColors = getBrandGradientColors(palette);
+  const { shouldReduceMotion } = useAccessibility();
   const player = useAudioPlayer(levels[0].audio, { updateInterval: 100 });
   const status = useAudioPlayerStatus(player);
   const [levelIndex, setLevelIndex] = useState(0);
@@ -142,26 +167,28 @@ export default function AatsScreen() {
     router.replace('/aats');
   }
 
+  const totalPoints = results.reduce((total, result) => total + result.points, 0);
+  const totalDuration = results.reduce((total, result) => total + result.durationSeconds, 0);
+  const totalAttempts = results.reduce((total, result) => total + result.hits + result.mistimedPresses, 0);
+  const resultReport = {
+    testName: 'AATS · Atenção sustentada',
+    durationSeconds: totalDuration,
+    attempts: totalAttempts,
+    attemptsLabel: 'respostas',
+    score: totalPoints,
+    scoreLabel: 'pontos',
+    details: [
+      ...results.flatMap((result) => [
+        { label: `Nível ${result.label} · Duração`, value: formatDuration(result.durationSeconds) },
+        { label: `Nível ${result.label} · Palavras-alvo`, value: `${result.hits} de ${result.targetCount} acertos` },
+        { label: `Nível ${result.label} · Respostas fora do tempo`, value: String(result.mistimedPresses) },
+      ]),
+      { label: 'Critério de pontuação', value: '10 pontos por acerto; respostas fora do tempo não descontam' },
+    ],
+  };
+  const historySave = useCompletedTestHistory(resultReport, showResults);
+
   if (showResults) {
-    const totalPoints = results.reduce((total, result) => total + result.points, 0);
-    const totalDuration = results.reduce((total, result) => total + result.durationSeconds, 0);
-    const totalAttempts = results.reduce((total, result) => total + result.hits + result.mistimedPresses, 0);
-    const resultReport = {
-      testName: 'AATS · Atenção sustentada',
-      durationSeconds: totalDuration,
-      attempts: totalAttempts,
-      attemptsLabel: 'respostas',
-      score: totalPoints,
-      scoreLabel: 'pontos',
-      details: [
-        ...results.flatMap((result) => [
-          { label: `Nível ${result.label} · Duração`, value: formatDuration(result.durationSeconds) },
-          { label: `Nível ${result.label} · Palavras-alvo`, value: `${result.hits} de ${result.targetCount} acertos` },
-          { label: `Nível ${result.label} · Respostas fora do tempo`, value: String(result.mistimedPresses) },
-        ]),
-        { label: 'Critério de pontuação', value: '10 pontos por acerto; respostas fora do tempo não descontam' },
-      ],
-    };
     return (
       <MobileFrame>
         <View style={styles.resultPage}>
@@ -181,6 +208,16 @@ export default function AatsScreen() {
             <Text style={[styles.totalLabel, { color: palette.muted }]}>Pontuação total</Text>
             <Text style={[styles.totalPoints, { color: palette.primary }]}>{totalPoints} pontos</Text>
           </View>
+          {historySave.status === 'saving' ? <Text style={[styles.feedback, { color: palette.muted }]}>Salvando no histórico...</Text> : null}
+          {historySave.status === 'saved' ? <Text style={[styles.feedback, { color: palette.primary }]}>Resultado salvo no histórico do perfil.</Text> : null}
+          {historySave.status === 'error' ? (
+            <View>
+              <Text accessibilityRole="alert" style={[styles.errorText, { color: palette.danger }]}>{historySave.error}</Text>
+              <Pressable accessibilityRole="button" onPress={historySave.retry} style={styles.retryButton}>
+                <Text style={[styles.secondaryText, { color: palette.primary }]}>Tentar salvar novamente</Text>
+              </Pressable>
+            </View>
+          ) : null}
           <Pressable accessibilityRole="button" onPress={restartTest} style={styles.actionButton}>
             <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.actionGradient}>
               <Text style={styles.actionText}>Fazer o teste novamente</Text>
@@ -230,9 +267,9 @@ export default function AatsScreen() {
               accessibilityState={{ disabled: !status.isLoaded || Boolean(audioError) }}
               disabled={!status.isLoaded || Boolean(audioError)}
               onPress={startOrRespond}
-              style={({ pressed }) => [styles.responseButton, pressed && styles.responsePressed, (!status.isLoaded || Boolean(audioError)) && styles.responseDisabled]}
+              style={({ pressed }) => [styles.responseButton, pressed && !shouldReduceMotion && styles.responsePressed, (!status.isLoaded || Boolean(audioError)) && styles.responseDisabled]}
             >
-              <LinearGradient colors={audioStarted ? gradientColors : ['#25834B', '#176E55']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.responseGradient}>
+              <LinearGradient colors={audioStarted ? gradientColors : [theme.colors.brand.green, theme.colors.brand.green]} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }} style={styles.responseGradient}>
                 <Text style={styles.responseTitle}>{!status.isLoaded ? 'CARREGANDO' : audioStarted ? 'OUVI O ALVO' : 'TOQUE PARA COMEÇAR'}</Text>
                 <Text style={styles.responseCaption}>{audioStarted ? 'Toque no momento da palavra' : 'O áudio será reproduzido uma vez'}</Text>
               </LinearGradient>
@@ -265,44 +302,46 @@ export default function AatsScreen() {
 }
 
 const styles = StyleSheet.create({
-  page: { flex: 1, gap: 20 },
-  heading: { gap: 7 },
-  kicker: { fontSize: 10, fontWeight: '800' },
-  title: { fontSize: 25, lineHeight: 31, fontWeight: '700' },
-  levelLabel: { fontSize: 15, fontWeight: '700' },
-  instructions: { fontSize: 14, lineHeight: 21 },
-  progressTrack: { flexDirection: 'row', gap: 8 },
-  progressStep: { flex: 1, height: 5, borderRadius: 3 },
-  gameArea: { flex: 1, minHeight: 340, alignItems: 'center', justifyContent: 'center', gap: 12 },
-  responseButton: { width: '76%', maxWidth: 286, aspectRatio: 1, borderRadius: 150, overflow: 'hidden' },
-  responseGradient: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24, gap: 12 },
+  loading: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.spacing[24] },
+  loadingText: { fontSize: theme.typography.fontSize[14], textAlign: 'center' },
+  page: { flex: 1, gap: theme.spacing[20] },
+  heading: { gap: theme.spacing[7] },
+  kicker: { fontSize: theme.typography.fontSize[10], fontWeight: '800' },
+  title: { fontSize: theme.typography.fontSize[25], lineHeight: theme.typography.lineHeight[31], fontWeight: '700' },
+  levelLabel: { fontSize: theme.typography.fontSize[15], fontWeight: '700' },
+  instructions: { fontSize: theme.typography.fontSize[14], lineHeight: theme.typography.lineHeight[21] },
+  progressTrack: { flexDirection: 'row', gap: theme.spacing[8] },
+  progressStep: { flex: 1, height: theme.sizes[5], borderRadius: theme.radii[3] },
+  gameArea: { flex: 1, minHeight: theme.sizes[340], alignItems: 'center', justifyContent: 'center', gap: theme.spacing[12] },
+  responseButton: { width: '76%', maxWidth: theme.sizes[286], aspectRatio: 1, borderRadius: theme.radii[150], overflow: 'hidden' },
+  responseGradient: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: theme.spacing[24], gap: theme.spacing[12] },
   responsePressed: { transform: [{ scale: 0.97 }] },
   responseDisabled: { opacity: 0.65 },
-  responseTitle: { color: '#FFFFFF', fontSize: 17, lineHeight: 23, fontWeight: '800', textAlign: 'center' },
-  responseCaption: { maxWidth: 180, color: '#FFFFFF', fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  audioProgress: { width: '100%', height: 4, borderRadius: 2, overflow: 'hidden' },
+  responseTitle: { color: theme.colors.white, fontSize: theme.typography.fontSize[17], lineHeight: theme.typography.lineHeight[23], fontWeight: '800', textAlign: 'center' },
+  responseCaption: { maxWidth: theme.sizes[180], color: theme.colors.white, fontSize: theme.typography.fontSize[12], lineHeight: theme.typography.lineHeight[18], textAlign: 'center' },
+  audioProgress: { width: '100%', height: theme.sizes[4], borderRadius: theme.radii[2], overflow: 'hidden' },
   audioProgressFill: { height: '100%' },
-  audioTime: { minHeight: 18, fontSize: 11 },
-  feedback: { minHeight: 20, fontSize: 13, textAlign: 'center' },
-  errorText: { fontSize: 13, lineHeight: 19, textAlign: 'center' },
-  errorActions: { alignItems: 'center', gap: 8 },
-  retryButton: { minHeight: 40, justifyContent: 'center', paddingHorizontal: 12 },
-  footerHint: { fontSize: 12, lineHeight: 18, textAlign: 'center' },
-  nextLevelPanel: { flex: 1, minHeight: 280, justifyContent: 'center', gap: 18 },
-  nextLevelTitle: { fontSize: 21, fontWeight: '700' },
-  actionButton: { minHeight: 50, borderRadius: 9, overflow: 'hidden' },
-  actionGradient: { flex: 1, minHeight: 50, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18 },
-  actionText: { color: '#FFFFFF', fontSize: 15, fontWeight: '700' },
-  resultPage: { flex: 1, gap: 14 },
-  subtitle: { fontSize: 14, lineHeight: 20 },
-  resultRow: { minHeight: 72, borderWidth: 1, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  resultCopy: { flex: 1, gap: 4 },
-  resultLevel: { fontSize: 14, fontWeight: '700' },
-  resultDetail: { fontSize: 11, lineHeight: 16 },
-  resultPoints: { fontSize: 20, fontWeight: '800' },
-  totalPanel: { minHeight: 94, borderWidth: 1, borderRadius: 8, alignItems: 'center', justifyContent: 'center', gap: 6 },
-  totalLabel: { fontSize: 12 },
-  totalPoints: { fontSize: 25, fontWeight: '800' },
-  secondaryButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  secondaryText: { fontSize: 14, fontWeight: '700' },
+  audioTime: { minHeight: theme.sizes[18], fontSize: theme.typography.fontSize[11] },
+  feedback: { minHeight: theme.sizes[20], fontSize: theme.typography.fontSize[13], textAlign: 'center' },
+  errorText: { fontSize: theme.typography.fontSize[13], lineHeight: theme.typography.lineHeight[19], textAlign: 'center' },
+  errorActions: { alignItems: 'center', gap: theme.spacing[8] },
+  retryButton: { minHeight: theme.sizes[40], justifyContent: 'center', paddingHorizontal: theme.spacing[12] },
+  footerHint: { fontSize: theme.typography.fontSize[12], lineHeight: theme.typography.lineHeight[18], textAlign: 'center' },
+  nextLevelPanel: { flex: 1, minHeight: theme.sizes[280], justifyContent: 'center', gap: theme.spacing[18] },
+  nextLevelTitle: { fontSize: theme.typography.fontSize[21], fontWeight: '700' },
+  actionButton: { minHeight: theme.sizes[50], borderRadius: theme.radii[9], overflow: 'hidden' },
+  actionGradient: { flex: 1, minHeight: theme.sizes[50], alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing[18] },
+  actionText: { color: theme.colors.white, fontSize: theme.typography.fontSize[15], fontWeight: '700' },
+  resultPage: { flex: 1, gap: theme.spacing[14] },
+  subtitle: { fontSize: theme.typography.fontSize[14], lineHeight: theme.typography.lineHeight[20] },
+  resultRow: { minHeight: theme.sizes[72], borderWidth: theme.sizes[1], borderRadius: theme.radii[8], padding: theme.spacing[12], flexDirection: 'row', alignItems: 'center', gap: theme.spacing[12] },
+  resultCopy: { flex: 1, gap: theme.spacing[4] },
+  resultLevel: { fontSize: theme.typography.fontSize[14], fontWeight: '700' },
+  resultDetail: { fontSize: theme.typography.fontSize[11], lineHeight: theme.typography.lineHeight[16] },
+  resultPoints: { fontSize: theme.typography.fontSize[20], fontWeight: '800' },
+  totalPanel: { minHeight: theme.sizes[94], borderWidth: theme.sizes[1], borderRadius: theme.radii[8], alignItems: 'center', justifyContent: 'center', gap: theme.spacing[6] },
+  totalLabel: { fontSize: theme.typography.fontSize[12] },
+  totalPoints: { fontSize: theme.typography.fontSize[25], fontWeight: '800' },
+  secondaryButton: { minHeight: theme.sizes[48], alignItems: 'center', justifyContent: 'center' },
+  secondaryText: { fontSize: theme.typography.fontSize[14], fontWeight: '700' },
 });

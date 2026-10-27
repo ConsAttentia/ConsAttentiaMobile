@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { router } from 'expo-router';
 
-import { AuthButton, AuthField, AuthFrame, AuthHeading, AuthLink, AuthMessage } from '@/components/auth-ui';
-import { getAuthErrorMessage, register } from '@/lib/auth';
-import { auth } from '@/lib/firebase';
+import { AuthButton, AuthField, AuthFrame, AuthHeading, AuthLink, AuthMessage } from '@/features/auth/components/auth-ui';
+import { useAuth } from '@/features/auth/hooks/use-auth';
+import { notifyAuthError } from '@/features/auth/utils/auth-notifications';
 
 export default function RegisterScreen() {
+  const { configured, registerAccount } = useAuth();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -22,16 +23,16 @@ export default function RegisterScreen() {
       setMessage('A senha precisa ter pelo menos 6 caracteres.');
       return;
     }
-    if (!auth) {
+    if (!configured) {
       setMessage('Configure o Firebase no arquivo .env para habilitar o cadastro.');
       return;
     }
     setBusy(true);
     try {
-      await register(name, email, password);
+      await registerAccount(name, email, password);
       router.replace('/home');
     } catch (error) {
-      setMessage(getAuthErrorMessage(error));
+      setMessage(notifyAuthError(error, 'Falha ao criar conta'));
     } finally {
       setBusy(false);
     }

@@ -1,4 +1,4 @@
-import { ToheGame, type ToheStage } from '@/components/tohe-game';
+import { ToheGame, type ToheStage } from '@/features/tests/tohe/components/tohe-game';
 
 const stages: readonly ToheStage[] = [
   {

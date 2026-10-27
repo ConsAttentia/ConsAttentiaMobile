@@ -1,9 +1,13 @@
+import { theme } from '@/shared/theme';
 import { useState } from 'react';
 import { router } from 'expo-router';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+
+import { AccessibleText as Text } from '@/features/accessibility/components/accessibility-text';
 import { LinearGradient } from 'expo-linear-gradient';
 
-import { getBrandGradientColors, MobileFrame, useAccessiblePalette } from '@/components/mobile-shell';
+import { getBrandGradientColors, MobileFrame, useAccessiblePalette } from '@/features/dashboard/components/mobile-shell';
 
 const members = [
   {
@@ -70,9 +74,15 @@ export default function AboutScreen() {
             <Text style={[styles.readMoreText, { color: palette.accent }]}>
               {descriptionExpanded ? 'Ler menos' : 'Ler mais'}
             </Text>
-            <Text style={[styles.readMoreArrow, { color: palette.accent }]}>
-              {descriptionExpanded ? '⌃' : '⌄'}
-            </Text>
+            <SymbolView
+              name={{
+                ios: descriptionExpanded ? 'chevron.up' : 'chevron.down',
+                android: descriptionExpanded ? 'expand_less' : 'expand_more',
+                web: descriptionExpanded ? 'expand_less' : 'expand_more',
+              }}
+              size={theme.sizes[16]}
+              tintColor={palette.accent}
+            />
           </Pressable>
         </View>
 
@@ -87,23 +97,22 @@ export default function AboutScreen() {
 }
 
 const styles = StyleSheet.create({
-  content: { gap: 20 },
-  hero: { gap: 7, marginHorizontal: -20, marginTop: -22, paddingHorizontal: 22, paddingTop: 26, paddingBottom: 24 },
-  eyebrow: { color: '#E3F3F2', fontSize: 10, fontWeight: '800' },
-  title: { color: '#FFFFFF', fontSize: 25, lineHeight: 31, fontWeight: '700' },
-  subtitle: { color: '#E3F3F2', fontSize: 13, lineHeight: 19 },
-  section: { gap: 10 },
-  sectionTitle: { fontSize: 18, fontWeight: '700' },
-  member: { minHeight: 82, borderWidth: 1, borderRadius: 8, padding: 12, flexDirection: 'row', alignItems: 'center', gap: 12 },
-  avatar: { width: 54, height: 54, borderRadius: 8, backgroundColor: '#C7D2D3' },
-  memberCopy: { flex: 1, gap: 4 },
-  memberName: { fontSize: 14, lineHeight: 19, fontWeight: '700' },
-  memberRole: { fontSize: 12, lineHeight: 17, fontWeight: '600' },
-  projectCopy: { fontSize: 13, lineHeight: 20 },
-  readMoreButton: { alignSelf: 'flex-start', minHeight: 32, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 2 },
-  readMoreText: { fontSize: 12, fontWeight: '600' },
-  readMoreArrow: { fontSize: 16, lineHeight: 18, fontWeight: '600' },
-  backButton: { minHeight: 48, borderRadius: 8, overflow: 'hidden' },
-  backGradient: { minHeight: 48, alignItems: 'center', justifyContent: 'center' },
-  backText: { color: '#FFFFFF', fontSize: 14, fontWeight: '700' },
+  content: { gap: theme.spacing[20] },
+  hero: { gap: theme.spacing[7], marginHorizontal: -theme.spacing[20], marginTop: -theme.spacing[22], paddingHorizontal: theme.spacing[22], paddingTop: theme.spacing[26], paddingBottom: theme.spacing[24] },
+  eyebrow: { color: theme.colors.whiteTint, fontSize: theme.typography.fontSize[10], fontWeight: '800' },
+  title: { color: theme.colors.white, fontSize: theme.typography.fontSize[25], lineHeight: theme.typography.lineHeight[31], fontWeight: '700' },
+  subtitle: { color: theme.colors.whiteTint, fontSize: theme.typography.fontSize[13], lineHeight: theme.typography.lineHeight[19] },
+  section: { gap: theme.spacing[10] },
+  sectionTitle: { fontSize: theme.typography.fontSize[18], fontWeight: '700' },
+  member: { minHeight: theme.sizes[82], borderWidth: theme.sizes[1], borderRadius: theme.radii[8], padding: theme.spacing[12], flexDirection: 'row', alignItems: 'center', gap: theme.spacing[12] },
+  avatar: { width: theme.sizes[54], height: theme.sizes[54], borderRadius: theme.radii[8], backgroundColor: theme.colors.memberAvatar },
+  memberCopy: { flex: 1, gap: theme.spacing[4] },
+  memberName: { fontSize: theme.typography.fontSize[14], lineHeight: theme.typography.lineHeight[19], fontWeight: '700' },
+  memberRole: { fontSize: theme.typography.fontSize[12], lineHeight: theme.typography.lineHeight[17], fontWeight: '600' },
+  projectCopy: { fontSize: theme.typography.fontSize[13], lineHeight: theme.typography.lineHeight[20] },
+  readMoreButton: { alignSelf: 'flex-start', minHeight: theme.sizes[32], flexDirection: 'row', alignItems: 'center', gap: theme.spacing[5], paddingHorizontal: theme.spacing[2] },
+  readMoreText: { fontSize: theme.typography.fontSize[12], fontWeight: '600' },
+  backButton: { minHeight: theme.sizes[48], borderRadius: theme.radii[8], overflow: 'hidden' },
+  backGradient: { minHeight: theme.sizes[48], alignItems: 'center', justifyContent: 'center' },
+  backText: { color: theme.colors.white, fontSize: theme.typography.fontSize[14], fontWeight: '700' },
 });
