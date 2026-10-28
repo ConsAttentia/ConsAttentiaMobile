@@ -87,17 +87,24 @@ export function MobileFrame({
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1 },
+  safeArea: { flex: 1, backgroundColor: theme.colors.background },
   header: {
-    minHeight: theme.sizes[72],
+    minHeight: theme.sizes[68],
     paddingHorizontal: theme.spacing[18],
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
+    borderBottomLeftRadius: theme.radii[18],
+    borderBottomRightRadius: theme.radii[18],
+    shadowColor: '#000000',
+    shadowOpacity: 0.12,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 6,
   },
-  logo: { width: theme.sizes[230], height: theme.sizes[62] },
-  content: { width: '100%', maxWidth: theme.layout.contentMaxWidth, alignSelf: 'center', flexGrow: 1, paddingHorizontal: theme.spacing[20], paddingTop: theme.spacing[22], paddingBottom: theme.spacing[36], gap: theme.spacing[20] },
+  logo: { width: theme.sizes[180], height: theme.sizes[48] },
+  content: { width: '100%', maxWidth: theme.layout.contentMaxWidth, alignSelf: 'center', flexGrow: 1, paddingHorizontal: theme.spacing[18], paddingTop: theme.spacing[18], paddingBottom: theme.spacing[28], gap: theme.spacing[16] },
   compactContent: { paddingTop: theme.spacing[0], paddingBottom: theme.spacing[16], gap: theme.spacing[12] },
   flexContent: { flex: 1 },
 });

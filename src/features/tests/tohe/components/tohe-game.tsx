@@ -26,9 +26,16 @@ export type TohePiece = {
   label: string;
 };
 
-export type ToheStage = {
+export type ToheStory = {
+  id: string;
   label: string;
-  pieces?: readonly TohePiece[];
+  pieces: readonly TohePiece[];
+};
+
+export type ToheStage = {
+  id: string;
+  label: string;
+  stories?: readonly ToheStory[];
   placeholderImage?: ImageSourcePropType;
 };
 
@@ -51,17 +58,23 @@ function shufflePieces(pieces: readonly TohePiece[]) {
   return shuffled;
 }
 
+function pickRandomStory(stories: readonly ToheStory[]) {
+  if (!stories.length) return null;
+  return stories[Math.floor(Math.random() * stories.length)] ?? null;
+}
+
 export function ToheGame({ stages }: ToheGameProps) {
   const palette = useAccessiblePalette();
   const gradientColors = getBrandGradientColors(palette);
   const { shouldReduceMotion } = useAccessibility();
   const [stageIndex, setStageIndex] = useState(0);
   const stage = stages[stageIndex];
-  const expectedPieces = stage.pieces ?? [];
-  const [shuffledPieces, setShuffledPieces] = useState(() => shufflePieces(stages[0]?.pieces ?? []));
-  const pieces = stage.placeholderImage ? [] : shuffledPieces;
+  const [currentStory, setCurrentStory] = useState<ToheStory | null>(() => pickRandomStory(stage?.stories ?? []));
+  const expectedPieces = currentStory?.pieces ?? [];
+  const [shuffledPieces, setShuffledPieces] = useState(() => shufflePieces(expectedPieces));
+  const pieces = shuffledPieces;
   const slots = expectedPieces.map((_, index) => index + 1);
-  const [placements, setPlacements] = useState<Placements>(() => createEmptyBoard((stages[0]?.pieces ?? []).map((_, index) => index + 1)));
+  const [placements, setPlacements] = useState<Placements>(() => createEmptyBoard(expectedPieces.map((_, index) => index + 1)));
   const [selectedPiece, setSelectedPiece] = useState<string | null>(null);
   const [message, setMessage] = useState('');
   const [complete, setComplete] = useState(false);
@@ -69,6 +82,28 @@ export function ToheGame({ stages }: ToheGameProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const [attemptCount, setAttemptCount] = useState(0);
   const startedAt = useRef<number | null>(null);
+
+  function prepareStory(nextStage: ToheStage, now: number) {
+    const nextStory = pickRandomStory(nextStage.stories ?? []);
+    const nextPieces = nextStory?.pieces ?? [];
+    setCurrentStory(nextStory);
+    setShuffledPieces(shufflePieces(nextPieces));
+    setPlacements(createEmptyBoard(nextPieces.map((_, index) => index + 1)));
+    setSelectedPiece(null);
+    setMessage('');
+    setComplete(false);
+    setReadyPlaceholderStage(null);
+    setAttemptCount(0);
+    startedAt.current = now;
+    setElapsedSeconds(0);
+  }
+
+  function changeStage(nextIndex: number, now: number) {
+    const nextStage = stages[nextIndex];
+    if (!nextStage) return;
+    setStageIndex(nextIndex);
+    prepareStory(nextStage, now);
+  }
 
   useEffect(() => {
     if (complete) return;
@@ -82,10 +117,10 @@ export function ToheGame({ stages }: ToheGameProps) {
   }, [complete]);
 
   useEffect(() => {
-    if (!stage.placeholderImage) return;
+    if (!stage?.placeholderImage) return;
     const timeout = setTimeout(() => setReadyPlaceholderStage(stageIndex), 450);
     return () => clearTimeout(timeout);
-  }, [stageIndex, stage.placeholderImage]);
+  }, [stageIndex, stage?.placeholderImage]);
 
   const elapsedLabel = formatDuration(elapsedSeconds);
 
@@ -107,10 +142,10 @@ export function ToheGame({ stages }: ToheGameProps) {
     setMessage('');
   }
 
-  const placeholderReady = !stage.placeholderImage || readyPlaceholderStage === stageIndex;
+  const placeholderReady = !stage?.placeholderImage || readyPlaceholderStage === stageIndex;
 
   function finishExperiment(completedAt: number) {
-    if (stage.placeholderImage) {
+    if (stage?.placeholderImage) {
       if (!placeholderReady) return;
       if (startedAt.current !== null) {
         setElapsedSeconds(Math.floor((completedAt - startedAt.current) / 1000));
@@ -120,6 +155,8 @@ export function ToheGame({ stages }: ToheGameProps) {
       setMessage('');
       return;
     }
+
+    if (!currentStory) return;
 
     setAttemptCount((count) => count + 1);
     const isCorrect = slots.every((slot) => placements[slot] === expectedPieces[slot - 1]?.id);
@@ -135,39 +172,18 @@ export function ToheGame({ stages }: ToheGameProps) {
   }
 
   function resetExperiment(now: number) {
-    setPlacements(createEmptyBoard(slots));
-    setSelectedPiece(null);
-    setMessage('');
-    setComplete(false);
-    startedAt.current = now;
-    setElapsedSeconds(0);
+    if (!stage) return;
+    prepareStory(stage, now);
   }
 
-  function advanceStage() {
+  function advanceStage(now: number) {
     const nextIndex = stageIndex + 1;
-    const nextStage = stages[nextIndex];
-    if (!nextStage) return;
-    setPlacements(createEmptyBoard((nextStage.pieces ?? []).map((_, index) => index + 1)));
-    setShuffledPieces(shufflePieces(nextStage.pieces ?? []));
-    setSelectedPiece(null);
-    setMessage('');
-    setStageIndex(nextIndex);
-    setReadyPlaceholderStage(null);
-    setComplete(false);
+    if (nextIndex >= stages.length) return;
+    changeStage(nextIndex, now);
   }
 
   function restartExperiment(now: number) {
-    const firstStage = stages[0];
-    setPlacements(createEmptyBoard((firstStage?.pieces ?? []).map((_, index) => index + 1)));
-    setShuffledPieces(shufflePieces(firstStage?.pieces ?? []));
-    setSelectedPiece(null);
-    setMessage('');
-    setStageIndex(0);
-    setReadyPlaceholderStage(null);
-    setComplete(false);
-    setAttemptCount(0);
-    startedAt.current = now;
-    setElapsedSeconds(0);
+    changeStage(0, now);
   }
 
   const isFinalStage = stageIndex === stages.length - 1;
@@ -190,15 +206,37 @@ export function ToheGame({ stages }: ToheGameProps) {
 
   return (
     <MobileFrame>
+      <View style={styles.levelSelector}>
+        {stages.map((item, index) => {
+          const selected = index === stageIndex;
+          return (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityState={{ selected }}
+              key={item.id}
+              onPress={() => changeStage(index, Date.now())}
+              style={[
+                styles.levelButton,
+                {
+                  backgroundColor: selected ? palette.surface : 'transparent',
+                  borderColor: selected ? palette.primary : palette.border,
+                },
+              ]}>
+              <Text style={[styles.levelButtonText, { color: selected ? palette.primary : palette.muted }]}>{item.label}</Text>
+            </Pressable>
+          );
+        })}
+      </View>
+
       <View style={styles.heading}>
-        <Text style={[styles.kicker, { color: palette.primary }]}>CONSATTENTIA · TOHE · {stage.label}</Text>
-        <Text style={[styles.title, { color: palette.text }]}>{stage.placeholderImage ? 'Nível difícil' : 'Organize a história'}</Text>
+        <Text style={[styles.kicker, { color: palette.primary }]}>CONSATTENTIA · TOHE · {stage?.label}</Text>
+        <Text style={[styles.title, { color: palette.text }]}>{stage?.placeholderImage ? 'Nível difícil' : `Organize a história · ${currentStory?.label ?? stage?.label}`}</Text>
         <Text style={[styles.instructions, { color: palette.muted }]}>
-          {stage.placeholderImage ? 'Esta etapa está em desenvolvimento.' : 'Toque em uma cena e depois no espaço em que ela deve ficar.'}
+          {stage?.placeholderImage ? 'Esta etapa está em desenvolvimento.' : 'Toque em uma cena e depois no espaço em que ela deve ficar.'}
         </Text>
       </View>
 
-      {stage.placeholderImage ? (
+      {stage?.placeholderImage ? (
         <View style={[styles.placeholderStage, { backgroundColor: palette.surface, borderColor: palette.border }]}>
           <Image accessibilityLabel="Imagem ilustrativa do nível difícil" resizeMode="contain" source={stage.placeholderImage} style={styles.placeholderImage} />
           <Text style={[styles.placeholderCopy, { color: palette.muted }]}>Mais cenas e atividades para este nível serão adicionadas em breve.</Text>
@@ -303,7 +341,7 @@ export function ToheGame({ stages }: ToheGameProps) {
             <Text style={[styles.successTime, { color: palette.muted }]}>{attemptCount === 1 ? '1 tentativa' : `${attemptCount} tentativas`}</Text>
             <Pressable
               accessibilityRole="button"
-              onPress={() => isFinalStage ? router.replace({ pathname: '/home', params: { openTests: '1' } }) : advanceStage()}
+              onPress={() => isFinalStage ? router.replace({ pathname: '/home', params: { openTests: '1' } }) : advanceStage(Date.now())}
               style={[styles.finishButton, styles.successAction]}
             >
               <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.finishGradient}>
@@ -337,6 +375,9 @@ export function ToheGame({ stages }: ToheGameProps) {
 }
 
 const styles = StyleSheet.create({
+  levelSelector: { flexDirection: 'row', gap: theme.spacing[8], marginBottom: theme.spacing[8] },
+  levelButton: { flex: 1, minHeight: theme.sizes[40], borderWidth: theme.sizes[1], borderRadius: theme.radii[8], alignItems: 'center', justifyContent: 'center', paddingHorizontal: theme.spacing[8] },
+  levelButtonText: { fontSize: theme.typography.fontSize[12], fontWeight: '700' },
   heading: { gap: theme.spacing[6] },
   kicker: { fontSize: theme.typography.fontSize[10], fontWeight: '800', letterSpacing: theme.sizes[1] },
   title: { fontSize: theme.typography.fontSize[24], lineHeight: theme.typography.lineHeight[30], fontWeight: '700' },

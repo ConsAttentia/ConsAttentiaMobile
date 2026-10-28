@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 
 import { useAccessibility } from '@/features/accessibility/context/accessibility-context';
+import { useAccessiblePalette } from '@/features/dashboard/components/mobile-shell';
 
 interface TabDefinition {
   label: string;
@@ -24,6 +25,7 @@ const tabs = [
 export function BottomNavigation() {
   const pathname = usePathname();
   const { highContrast, shouldReduceMotion } = useAccessibility();
+  const palette = useAccessiblePalette();
   const insets = useSafeAreaInsets();
   const [barWidth, setBarWidth] = useState(0);
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
@@ -36,7 +38,9 @@ export function BottomNavigation() {
         ? 1
         : 0;
   const highlightIndex = hoveredIndex ?? activeIndex;
-  const barColors = highContrast ? [theme.colors.black, theme.colors.black] as const : [theme.colors.brand.green, theme.colors.brand.blue] as const;
+  const barColors = highContrast
+    ? [theme.colors.highContrast.gradient, theme.colors.highContrast.gradient] as const
+    : [palette.primary, palette.accent] as const;
 
   useEffect(() => {
     if (barWidth === 0) return;
@@ -73,7 +77,9 @@ export function BottomNavigation() {
       />
       {tabs.map(({ label, route, symbol }, index) => {
         const selected = activeIndex === index;
-        const iconColor = highContrast ? (selected ? theme.colors.black : theme.colors.white) : theme.colors.navy;
+        const iconColor = highContrast
+          ? (selected ? theme.colors.black : theme.colors.white)
+          : (selected ? palette.primary : theme.colors.navy);
         return (
           <Pressable
             accessibilityRole="button"
@@ -93,7 +99,21 @@ export function BottomNavigation() {
 }
 
 const styles = StyleSheet.create({
-  bar: { width: '100%', maxWidth: theme.sizes[840], alignSelf: 'center', flexDirection: 'row', position: 'relative', overflow: 'hidden' },
+  bar: {
+    width: '100%',
+    maxWidth: theme.layout.contentMaxWidth,
+    alignSelf: 'center',
+    flexDirection: 'row',
+    position: 'relative',
+    overflow: 'hidden',
+    borderTopLeftRadius: theme.radii[18],
+    borderTopRightRadius: theme.radii[18],
+    shadowColor: '#000000',
+    shadowOpacity: 0.12,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: -4 },
+    elevation: 8,
+  },
   highlight: { position: 'absolute', top: theme.spacing[7], left: theme.spacing[0], width: theme.sizes[34], height: theme.sizes[34], borderRadius: theme.radii[17], pointerEvents: 'none' },
   tab: { flex: 1, height: theme.sizes[48], alignItems: 'center', justifyContent: 'center', zIndex: 1 },
 });

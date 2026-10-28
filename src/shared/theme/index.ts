@@ -77,9 +77,9 @@ export const theme = {
     lineHeight: exactDimensions,
   },
   layout: {
-    contentMaxWidth: 840,
-    authPageMinHeight: 640,
-    authFormMaxWidth: 390,
+    contentMaxWidth: 460,
+    authPageMinHeight: 560,
+    authFormMaxWidth: 360,
   },
 } as const;
 

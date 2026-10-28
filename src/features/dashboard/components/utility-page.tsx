@@ -27,9 +27,9 @@ export function UtilityPage({
     <MobileFrame>
       <View style={styles.content}>
         <LinearGradient colors={gradientColors} start={{ x: 0, y: 0.5 }} end={{ x: 1, y: 0.5 }} style={styles.hero}>
-          <Text style={styles.eyebrow}>{eyebrow}</Text>
-          <Text style={styles.title}>{title}</Text>
-          <Text style={styles.description}>{description}</Text>
+          <Text style={[styles.eyebrow, { color: theme.colors.whiteTint }]}>{eyebrow}</Text>
+          <Text style={[styles.title, { color: theme.colors.white }]}>{title}</Text>
+          <Text style={[styles.description, { color: theme.colors.whiteTint }]}>{description}</Text>
         </LinearGradient>
         {children}
       </View>
